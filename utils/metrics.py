@@ -17,9 +17,9 @@ def calculate_max_drawdown(equity_curve: pd.Series) -> float:
 
 def calculate_cagr(equity_curve: pd.Series) -> float:
     """Compute Compound Annual Growth Rate (CAGR)."""
-    total_days = (equity_curve.index[-1] - equity_curve.index[0]).days
+    total_days = equity_curve.shape[0]
     total_return = equity_curve.iloc[-1] / equity_curve.iloc[0] - 1
-    return (1 + total_return) ** (365.0 / total_days) - 1
+    return (1 + total_return) ** (252.0 / total_days) - 1
 
 
 def win_rate(trades_df: pd.DataFrame) -> float:
@@ -31,13 +31,16 @@ def win_rate(trades_df: pd.DataFrame) -> float:
     return wins / total if total > 0 else 0.0
 
 
-def summarize_metrics(equity_curve: pd.Series, trades_df: pd.DataFrame, name: str = ""):
+def summarize_metrics(equity_curve: pd.DataFrame, trades_df: pd.DataFrame, name: str = ""):
     """Print a basic summary report."""
-    returns = equity_curve.pct_change().dropna()
+    equity = equity_curve['net_worth'] if 'net_worth' in equity_curve.columns else equity_curve
+    returns = equity.pct_change().dropna()
+    returns[returns == np.inf] = 0.0  # Handle infinite returns
 
     print(f"\n📊 Performance Summary: {name}")
     print("-" * 40)
     print(f"Sharpe Ratio:       {calculate_sharpe_ratio(returns):.2f}")
-    print(f"Max Drawdown:       {calculate_max_drawdown(equity_curve):.2%}")
-    print(f"CAGR:               {calculate_cagr(equity_curve):.2%}")
+    print(f"Max Drawdown:       {calculate_max_drawdown(equity):.2%}")
+    print(f"CAGR:               {calculate_cagr(equity):.2%}")
     print(f"Win Rate:           {win_rate(trades_df):.2%}")
+    print(f"Total Trades:       {trades_df.shape[0]}")
