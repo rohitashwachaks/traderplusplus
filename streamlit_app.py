@@ -4,6 +4,7 @@ from typing import List
 
 from core.backtester import Backtester
 from core.data_loader import DataIngestionManager
+from core.market_data import MarketData
 from core.guardrails.base import Guardrail
 from core.guardrails.trailing_stop_loss import TrailingStopLossGuardrail
 from core.visualizer import plot_equity_curve, plot_drawdown, plotly_interactive_equity
@@ -34,44 +35,23 @@ long_window = st.sidebar.slider("Long MA", 10, 100, 30)
 
 run_bt = st.sidebar.button("🚀 Run Backtest")
 
-# Run backtest
 if run_bt:
     st.success("Running backtest...")
 
-    # Create strategy
-    strategy = StrategyFactory.create_strategy(
-        strategy_type,
-        short_window=short_window,
-        long_window=long_window
-    )
+    # Data ingest
+    ingestion = DataIngestionManager(use_cache=True, force_refresh=False, source=data_source)
+    market_data = MarketData.from_ingestion(tickers, str(start_date), str(end_date), ingestion)
 
-    # Data loader
-    ingestion = DataIngestionManager(
-        use_cache=True,
-        force_refresh=False,
-        source=data_source
-    )
-
-    # Guardrails
+    # Strategy & Guardrails
+    strategy = StrategyFactory.create_strategy(strategy_type, short_window=short_window, long_window=long_window)
     guardrails: List[Guardrail] = []
     if use_guardrail:
         guardrails.append(TrailingStopLossGuardrail(stop_pct=stop_pct))
 
-    # Backtester
-    bt = Backtester(
-        strategy=strategy,
-        data_loader=ingestion.get_data,
-        starting_cash=cash,
-        guardrails=guardrails
-    )
+    # Backtest
+    bt = Backtester(strategy=strategy, market_data=market_data, starting_cash=cash, guardrails=guardrails)
+    bt.run(tickers, str(start_date), str(end_date))
 
-    bt.run(
-        symbols=tickers,
-        start_date=str(start_date),
-        end_date=str(end_date)
-    )
-
-    # Pull equity and trades
     equity_curve = bt.get_equity_curve()
     trade_log = bt.get_trade_log()
 
@@ -79,29 +59,26 @@ if run_bt:
     st.subheader("📋 Trade Log")
     st.dataframe(trade_log)
 
-    # Triggered stop-losses
+    # Trailing stops
     if "note" in trade_log.columns:
-        trailing_exits = trade_log[
-            (trade_log["action"] == "SELL") &
-            (trade_log["note"].str.contains("Trailing", na=False))
-        ]
-        if not trailing_exits.empty:
+        ts_exits = trade_log[(trade_log["action"] == "SELL") & trade_log["note"].str.contains("Trailing", na=False)]
+        if not ts_exits.empty:
             st.subheader("🔻 Trailing Stop Exits")
-            st.dataframe(trailing_exits)
+            st.dataframe(ts_exits)
 
-    # Visuals: Equity Curve
+    # Visuals
     st.subheader("📈 Equity Curve")
-    fig_eq = plot_equity_curve(equity_curve['net_worth'], title="Total Equity Curve")
+    fig_eq = plot_equity_curve(equity_curve['net_worth'])
     st.pyplot(fig_eq)
 
-    # Visuals: Drawdown
     st.subheader("📉 Drawdown")
-    fig_dd = plot_drawdown(equity_curve['net_worth'], title="Total Drawdown")
+    fig_dd = plot_drawdown(equity_curve['net_worth'])
     st.pyplot(fig_dd)
 
-    fig = plotly_interactive_equity(equity_curve['net_worth'], trade_log)
-    st.plotly_chart(fig)
-
-    # Metrics Table
     st.subheader("📊 Performance Summary")
     summarize_metrics(equity_curve, trade_log, name="Portfolio")
+
+    # Optional: Plotly chart
+    if st.checkbox("🔍 Show Interactive Chart"):
+        fig = plotly_interactive_equity(equity_curve['net_worth'], trade_log)
+        st.plotly_chart(fig)

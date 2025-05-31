@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 import pandas as pd
 from typing import Dict
 
+from core.market_data import MarketData
+
 
 class StrategyBase(ABC):
     @abstractmethod
@@ -12,24 +14,20 @@ class StrategyBase(ABC):
         pass
 
     @abstractmethod
-    def generate_signals(self, market_data: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
-        """
-        For each asset (symbol), return a DataFrame of signals.
-        Output: { 'AAPL': DataFrame, 'MSFT': DataFrame, ... }
-        Each DataFrame must include 'signal' and 'position' columns.
-        """
-        pass
-
-    @abstractmethod
-    def generate_allocations(
-            self,
-            signals: Dict[str, pd.DataFrame],
-            portfolio_cash: float,
-            market_data: Dict[str, pd.DataFrame]
+    def generate_signals(
+        self,
+        market_data: MarketData,
+        current_date: pd.Timestamp,
+        lookback_window: int = 60
     ) -> Dict[str, int]:
         """
-        Returns how many **shares** to buy per asset symbol.
-        Output: { 'AAPL': 4, 'MSFT': 3 }
+        For each asset (ticker), return the current trading signal.
+        Output: { 'AAPL': 1, 'MSFT': -1, 'SPY': 0 }
+        Each signal should be:
+        - 1 for Buy
+        - -1 for Sell
+        - 0 for Hold
+        Strategy must not look ahead beyond `current_date`.
         """
         pass
 

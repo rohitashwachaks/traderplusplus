@@ -15,11 +15,11 @@ class CAPMStrategy(StrategyBase):
 
     def generate_signals(self, market_data: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         signals = {}
-        for symbol, df in market_data.items():
+        for ticker, df in market_data.items():
             df = df.copy()
             df['signal'] = 0  # Placeholder for CAPM signals
             df['position'] = 0  # Placeholder for positions
-            signals[symbol] = df
+            signals[ticker] = df
         return signals
 
     def generate_allocations(

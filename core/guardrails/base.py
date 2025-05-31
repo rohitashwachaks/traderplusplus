@@ -9,6 +9,6 @@ class Guardrail(ABC):
         Evaluate which positions should be exited.
 
         Returns:
-            Dict of symbol → True if it should be force-sold
+            Dict of ticker → True if it should be force-sold
         """
         pass

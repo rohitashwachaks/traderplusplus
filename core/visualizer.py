@@ -66,12 +66,12 @@ def plot_per_asset_equity(position_history: Dict[str, List[int]],
                           prices: Dict[str, pd.DataFrame],
                           title: str = "Per-Asset Equity Curve"):
     plt.figure(figsize=(12, 6))
-    for symbol, shares_series in position_history.items():
-        if symbol not in prices:
+    for ticker, shares_series in position_history.items():
+        if ticker not in prices:
             continue
-        price_series = prices[symbol]['Close'].iloc[-len(shares_series):]
+        price_series = prices[ticker]['Close'].iloc[-len(shares_series):]
         value_series = pd.Series(shares_series, index=price_series.index) * price_series
-        plt.plot(value_series, label=f"{symbol} Value")
+        plt.plot(value_series, label=f"{ticker} Value")
 
     plt.title(title)
     plt.xlabel("Date")
@@ -96,7 +96,7 @@ def plot_equity_with_trades(equity_curve: pd.Series,
         date = pd.to_datetime(row['date'])
         if date in equity_curve.index:
             plt.axvline(date, color=color, linestyle='--', alpha=0.5)
-            plt.text(date, equity_curve.max() * 0.95, f"{row['symbol']}", fontsize=8, rotation=90)
+            plt.text(date, equity_curve.max() * 0.95, f"{row['ticker']}", fontsize=8, rotation=90)
 
     plt.title(title)
     plt.xlabel("Date")

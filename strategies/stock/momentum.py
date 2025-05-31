@@ -1,67 +1,54 @@
+from abc import ABC
+
 import pandas as pd
 from typing import Dict
 
+from core.market_data import MarketData
 from strategies.stock.base import StrategyBase, StrategyFactory
 
 
 @StrategyFactory.register("momentum")
-class MomentumStrategy(StrategyBase):
-    def __init__(self, short_window: int = 15, long_window: int = 30):
+class MomentumStrategy(StrategyBase, ABC):
+    def __init__(self, short_window: int = 10, long_window: int = 20):
         self.short_window = short_window
         self.long_window = long_window
 
     def get_name(self) -> str:
         return f"momentum_{self.short_window}_{self.long_window}"
 
-    def generate_signals(self, market_data: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
-        signal_dict = {}
+    def get_config(self) -> Dict:
+        return {
+            "type": "momentum",
+            "short_window": self.short_window,
+            "long_window": self.long_window,
+            "name": self.get_name()
+        }
 
-        for symbol, df in market_data.items():
-            df = df.copy()
-
-            # Moving averages
-            df['short_ma'] = df['Close'].rolling(window=self.short_window, min_periods=1).mean()
-            df['long_ma'] = df['Close'].rolling(window=self.long_window, min_periods=1).mean()
-
-            # Buy: short MA crosses above long MA
-            df['buy_signal'] = (
-                    (df['short_ma'].shift(1) <= df['long_ma'].shift(1)) &
-                    (df['short_ma'] > df['long_ma'])
-            )
-
-            # Sell: short MA crosses below long MA
-            df['sell_signal'] = (
-                    (df['short_ma'].shift(1) >= df['long_ma'].shift(1)) &
-                    (df['short_ma'] < df['long_ma'])
-            )
-
-            # Position: +1 (buy), -1 (sell), 0 (hold)
-            df['position'] = 0
-            df.loc[df['buy_signal'], 'position'] = 1
-            df.loc[df['sell_signal'], 'position'] = -1
-
-            signal_dict[symbol] = df
-
-        return signal_dict
-
-    def generate_allocations(
-            self,
-            signals: Dict[str, pd.DataFrame],
-            portfolio_cash: float,
-            market_data: Dict[str, pd.DataFrame]
+    def generate_signals(
+        self,
+        market_data: MarketData,
+        current_date: pd.Timestamp,
+        lookback_window: int = 60
     ) -> Dict[str, int]:
-        allocations = {}
+        """
+        Generate signals for all tickers based on moving average crossover.
+        """
+        signals = {}
+        for ticker in market_data.get_available_symbols():
+            history = market_data.get_history(ticker, end_date=current_date, lookback=lookback_window)
+            if len(history) < self.long_window:
+                signals[ticker] = 0
+                continue
 
-        for symbol, signal_df in signals.items():
-            signal = signal_df['position'].iloc[-1]
-            price = market_data[symbol]['Close'].iloc[-1]
+            short_ma = history['Close'].rolling(window=self.short_window, min_periods=1).mean()
+            long_ma = history['Close'].rolling(window=self.long_window, min_periods=1).mean()
 
-            if signal == 1:  # Buy signal
-                allocation = int((portfolio_cash / len(signals)) // price)
-                if allocation > 0:
-                    allocations[symbol] = allocation
+            # Crossover logic
+            if short_ma.iloc[-2] <= long_ma.iloc[-2] and short_ma.iloc[-1] > long_ma.iloc[-1]:
+                signals[ticker] = 1  # Buy
+            elif short_ma.iloc[-2] >= long_ma.iloc[-2] and short_ma.iloc[-1] < long_ma.iloc[-1]:
+                signals[ticker] = -1  # Sell
+            else:
+                signals[ticker] = 0  # Hold
 
-            elif signal == -1:  # Sell signal
-                allocations[symbol] = -1  # signal to sell full position
-
-        return allocations
+        return signals
