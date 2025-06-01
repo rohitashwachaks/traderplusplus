@@ -11,6 +11,7 @@ from core.visualizer import plot_equity_curve, plot_drawdown, plotly_interactive
 from strategies.stock.base import StrategyFactory
 from strategies.stock.capm_portfolio import CAPMStrategy
 from strategies.stock.momentum import MomentumStrategy
+from strategies.stock.buy_n_hold import BuyNHoldStrategy
 from utils.metrics import summarize_metrics
 
 
@@ -29,7 +30,7 @@ start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2023-01-0
 end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("2023-12-31"))
 
 st.sidebar.title("📐 Strategy")
-strategy_type = st.sidebar.selectbox("Strategy", ["momentum"])
+strategy_type = st.sidebar.selectbox("Strategy", ["momentum", "buy_n_hold"], index=0)
 short_window = st.sidebar.slider("Short MA", 5, 50, 10)
 long_window = st.sidebar.slider("Long MA", 10, 100, 30)
 
