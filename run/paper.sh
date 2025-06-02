@@ -1,0 +1,1 @@
+python run_backtest.py --mode paper --strategy momentum --tickers AAPL,MSFT --slippage 0.002 --plot

@@ -1,4 +1,3 @@
-# 🚀 Trader++: The Next-Gen Quant Trading Engine
 
 > **Unleash the power of modular, realistic, and extensible portfolio simulation.**
 
@@ -19,6 +18,53 @@ Trader++ isn’t just another backtesting tool. It’s a full-fledged quant trad
 - 💡 **Portfolio as a first-class citizen:** Track capital, trades, and metadata in one place.
 - 🧪 **Designed for research:** Easy to debug, extend, and run controlled experiments.
 - 🌱 **Open, modern, and Pythonic:** No black boxes, no vendor lock-in, and ready for your next big idea.
+
+---
+
+## 🏆 MVP Roadmap
+
+### 1. Unified Execution Engine
+- Common interface: `BacktestExecutor`, `PaperExecutor`, `LiveExecutor`
+- Live broker integration (Alpaca, IBKR, TD Ameritrade)
+- Real-time slippage, partial fills, latency simulation
+
+### 2. Advanced Strategy Framework
+- YAML/DSL config loader for no-code strategies
+- Multi-frequency, multi-asset support
+- ML model integration (Torch/Sklearn) + MLFlow/W&B logging
+
+### 3. Modular Risk & Portfolio Control
+- Position sizing (Kelly, risk parity, volatility targeting)
+- Real-time rule engine (e.g., freeze strategy on drawdown)
+- Hierarchical/nested portfolios with capital/risk constraints
+
+### 4. Performance & Attribution Analytics
+- Alpha, beta, Sharpe, Sortino, Calmar
+- Attribution by asset, sector, strategy
+- Trade replay and audit trail
+
+### 5. Interactive Visualization
+- Streamlit/Dash hybrid dashboard
+- Trade timeline, rolling metrics, slippage/turnover/holding histograms
+
+### 6. Scalable Simulation Engine
+- Multiprocessed/multithreaded backtesting core
+- GPU acceleration for ML strategies
+- Clean, event-driven simulation loop
+
+### 7. Data Layer
+- SQL/Parquet backend support
+- Live feed adapters
+- Flexible bar aggregators (time, volume, event)
+
+### 8. AI & Data-Driven Research
+- Sentiment and alt-data adapters (Reddit, news, Google Trends)
+- Cointegration, Kalman filter, auto-correlation modules
+
+### 9. Tests, Docs, Demos
+- Unit tests for each module
+- Example strategies (momentum, mean-reversion, breakout)
+- Jupyter/Streamlit demo notebooks
 
 ---
 
@@ -129,25 +175,7 @@ streamlit run streamlit_app.py
 
 ## 🌱 Vision for Future Work
 
-### 🎯 Execution & Simulation
-- Live trading interface (Alpaca, IBKR)
-- Slippage and commission modeling
-- Real-time execution with event-based feed
-
-### 🧠 Strategy Framework
-- Portfolio optimization (Risk Parity, Markowitz)
-- Signal pipelines (multi-indicator, ML-based)
-- RL and LLM-based adaptive strategies
-
-### 📊 Analytics & Visualization
-- Interactive dashboard (Streamlit/Plotly)
-- Trade replay, diagnostics
-- Alpha decomposition, factor attribution
-
-### 🧱 Engine Internals
-- Custom logging, debugging, test harness
-- Multiprocess strategy evaluation
-- Config-driven simulation pipelines
+See the MVP Roadmap above for our ambitious next steps!
 
 ---
 

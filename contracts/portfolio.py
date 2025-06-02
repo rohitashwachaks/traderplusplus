@@ -100,11 +100,16 @@ class Portfolio:
             self.positions[ticker].buy(shares_delta)
         elif shares_delta < 0:
             self.positions[ticker].sell(abs(shares_delta))
-        if self.positions[ticker].is_empty():
-            del self.positions[ticker]
 
     def get_trade_log(self) -> pd.DataFrame:
-        return pd.DataFrame(self.trade_log)
+        df = pd.DataFrame(self.trade_log)
+        if not df.empty:
+            df['date'] = pd.to_datetime(df['date'])
+            df.set_index('date', inplace=True)
+            df = df.sort_index()
+        else:
+            df = pd.DataFrame(columns=['date', 'ticker', 'action', 'shares', 'price', 'cash_remaining', 'note'])
+        return df
 
     def get_position(self, ticker) -> int:
         if ticker not in self.positions:
