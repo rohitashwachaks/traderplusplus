@@ -157,3 +157,61 @@ def plot_equity_vs_networth(equity_curve: pd.Series,
     plt.grid(True)
     plt.legend()
     return _finalize_plot(title)
+
+
+def plot_equity_vs_benchmark(
+    portfolio_curve: pd.Series,
+    benchmark_curve: pd.Series,
+    title: str = "Strategy vs Benchmark Equity Curve",
+    normalize: bool = True
+):
+    """
+    Plot portfolio equity and benchmark on the same chart for visual comparison.
+    If normalize=True, both curves start at 1 for relative performance.
+    """
+    _validate_equity_series(portfolio_curve)
+    _validate_equity_series(benchmark_curve)
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    # Align indices
+    common_idx = portfolio_curve.index.intersection(benchmark_curve.index)
+    p_curve = portfolio_curve.loc[common_idx]
+    b_curve = benchmark_curve.loc[common_idx]
+    if normalize:
+        p_curve = p_curve / p_curve.iloc[0]
+        b_curve = b_curve / b_curve.iloc[0]
+    plt.figure(figsize=(12, 5))
+    plt.plot(p_curve, label='Strategy', linewidth=2)
+    plt.plot(b_curve, label='Benchmark', linestyle='--', linewidth=2)
+    plt.title(title)
+    plt.xlabel("Date")
+    plt.ylabel("Normalized Value" if normalize else "Value ($)")
+    plt.grid(True)
+    plt.legend()
+    plt.gca().xaxis.set_major_formatter(DateFormatter('%Y-%m'))
+    return _finalize_plot(title)
+
+
+def plotly_equity_vs_benchmark(
+    portfolio_curve: pd.Series,
+    benchmark_curve: pd.Series,
+    title: str = "Strategy vs Benchmark Equity Curve",
+    normalize: bool = True
+):
+    """
+    Plotly interactive chart for portfolio vs benchmark.
+    """
+    import plotly.graph_objects as go
+    import pandas as pd
+    # Align indices
+    common_idx = portfolio_curve.index.intersection(benchmark_curve.index)
+    p_curve = portfolio_curve.loc[common_idx]
+    b_curve = benchmark_curve.loc[common_idx]
+    if normalize:
+        p_curve = p_curve / p_curve.iloc[0]
+        b_curve = b_curve / b_curve.iloc[0]
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=p_curve.index, y=p_curve, mode='lines', name='Strategy'))
+    fig.add_trace(go.Scatter(x=b_curve.index, y=b_curve, mode='lines', name='Benchmark'))
+    fig.update_layout(title=title, xaxis_title='Date', yaxis_title='Normalized Value' if normalize else 'Value ($)', template='plotly_white')
+    return fig

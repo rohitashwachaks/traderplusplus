@@ -9,9 +9,13 @@ from core.visualizer import plot_equity_curve, plot_per_asset_equity, plot_equit
     plotly_interactive_equity, plot_drawdown
 from strategies.stock.base import StrategyFactory
 from utils.metrics import summarize_metrics
+from contracts.portfolio import Portfolio
 from core.executors.backtest import BacktestExecutor
 from core.executors.paper import PaperExecutor
 from core.executors.live import LiveExecutor
+
+from analytics.performance_evaluator import PerformanceEvaluator
+import yfinance as yf
 
 
 def parse_args():
@@ -30,6 +34,7 @@ def parse_args():
     parser.add_argument("--slippage", type=float, default=0.001, help="Slippage for paper trading (e.g. 0.001 = 0.1%)")
     parser.add_argument("--broker", type=str, default=None,
                         help="Broker API module path for live trading (e.g. brokers.alpaca.AlpacaBrokerAPI)")
+    parser.add_argument("--benchmark", type=str, default="SPY", help="Benchmark ticker for performance comparison (default: SPY)")
     return parser.parse_args()
 
 
@@ -41,12 +46,17 @@ def main():
             f"Unsupported strategy: {args.strategy}. Supported strategies: {StrategyFactory.get_supported_strategies()}")
     strategy = StrategyFactory.create_strategy(args.strategy)
     ingestion = DataIngestionManager(use_cache=True, force_refresh=args.refresh, source=args.source)
-    market_data = MarketData.from_ingestion(tickers, args.start, args.end, ingestion)
+
+    benchmark = args.benchmark.upper()
+    if benchmark.startswith("^"):
+        benchmark = benchmark[1:]  # Remove caret for yfinance compatibility
+
+    market_data = MarketData.from_ingestion(tickers+[benchmark], args.start, args.end, ingestion)
     guardrails = [TrailingStopLossGuardrail()]
-    from contracts.portfolio import Portfolio
     portfolio = Portfolio(
         name=f"{args.strategy.capitalize()}Portfolio",
         tickers=market_data.get_available_symbols(),
+        benchmark=args.benchmark,
         starting_cash=args.cash,
         strategy=strategy,
         metadata={"source": f"{args.mode.capitalize()}Executor"}
@@ -81,6 +91,21 @@ def main():
         plot_drawdown(net_worth_series)
         plotly_interactive_equity(net_worth_series, trade_log)
     summarize_metrics(equity_curve=equity_curve, trades_df=trade_log, name=portfolio.name)
+
+    # --- Performance Evaluation ---
+    # Attempt to get a benchmark series (use first ticker if ^SPY not present)
+    try:
+        bench_ticker = portfolio.benchmark if hasattr(portfolio, 'benchmark') else args.benchmark
+        bench_df = yf.download(bench_ticker, start=args.start, end=args.end)
+        benchmark_curve = bench_df['Close']
+        benchmark_curve.index = pd.to_datetime(benchmark_curve.index)
+        benchmark_curve = benchmark_curve.reindex(equity_curve.index, method='ffill')
+        evaluator = PerformanceEvaluator(equity_curve['net_worth'], benchmark_curve)
+        perf_metrics = evaluator.compute_metrics()
+        print("\n=== Strategy vs. Benchmark ===")
+        print(evaluator.summary())
+    except Exception as e:
+        print(f"[WARN] Could not compute benchmark performance: {e}")
 
 
 if __name__ == "__main__":

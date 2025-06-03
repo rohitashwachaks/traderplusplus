@@ -7,17 +7,21 @@ from core.market_data import MarketData
 
 
 class StrategyBase(ABC):
+    """
+    Abstract base class for trading strategies.
+    All strategies must implement get_name and generate_signals.
+    """
     @abstractmethod
     def get_name(self) -> str:
         """
-        Unique strategy name for identification.
+        Return unique strategy name for identification.
         """
         pass
 
     @abstractmethod
     def generate_signals(
         self,
-        market_data: MarketData,
+        market_data: 'MarketData',
         current_date: pd.Timestamp,
         positions: Dict[str, Asset | CashAsset]
     ) -> Dict[str, int]:
@@ -52,6 +56,7 @@ class StrategyFactory:
     @classmethod
     def get_supported_strategies(cls) -> set:
         """
-        Returns a list of all registered strategy names.
+        Return all registered strategy names
+        :return:
         """
         return set(cls._registry.keys())

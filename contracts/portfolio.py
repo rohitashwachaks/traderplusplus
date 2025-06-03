@@ -2,30 +2,34 @@ from typing import Dict, List
 
 import pandas as pd
 
-from analytics.performance import evaluate_portfolio_performance
 from contracts.asset import Asset, CashAsset
 from strategies.stock.base import StrategyBase
 
 
 class Portfolio:
+    """
+    Portfolio manages asset and cash positions, executes trades, and logs portfolio history.
+    It does not handle analytics or performance evaluation directly.
+    """
     def __init__(self,
                  name: str,
                  tickers: List[str],
                  starting_cash: float,
                  strategy: StrategyBase,
-                 benchmark: str = "^SPY",
+                 benchmark: str = "SPY",
                  rebalance_freq: str = "monthly",
                  metadata: Dict = None):
         """
-        Initialize a Portfolio object with strategy, tickers, and starting cash.
+        Initialize a Portfolio object.
 
-        :param name: Name of the portfolio
-        :param tickers: List of tickers in the portfolio
-        :param starting_cash: Initial cash in the portfolio
-        :param strategy: Strategy object associated with this portfolio
-        :param benchmark: Benchmark ticker used to compare portfolio performance (e.g., ^SPY)
-        :param rebalance_freq: Frequency of rebalancing (e.g., monthly, quarterly)
-        :param metadata: Additional metadata or user-defined attributes
+        Args:
+            name (str): Name of the portfolio.
+            tickers (List[str]): List of asset tickers.
+            starting_cash (float): Initial cash balance.
+            strategy (StrategyBase): Strategy instance to generate signals.
+            benchmark (str): Benchmark ticker for reference only.
+            rebalance_freq (str): Rebalancing frequency (e.g., 'monthly').
+            metadata (Dict, optional): Additional metadata.
         """
         self.name = name
         self.tickers = tickers
@@ -39,19 +43,22 @@ class Portfolio:
             for ticker in tickers
         }
         self.positions['CASH'] = CashAsset(starting_cash)
-        self.trade_log = []
+        self.trade_log: List[dict] = []
         self.position_history: Dict[str, List[int]] = {}
 
-    def execute_trade(self, date, ticker, action, shares, price, note='Strategy Signal'):
+    def execute_trade(self, date: pd.Timestamp, ticker: str, action: str, shares: int, price: float, note: str = 'Strategy Signal'):
         """
-        Executes a trade and adjusts portfolio cash and position accordingly.
+        Execute a trade and update portfolio positions and cash.
 
-        :param date: Trade date
-        :param ticker: Ticker symbol
-        :param action: 'BUY' or 'SELL'
-        :param shares: Number of shares
-        :param price: Trade price per share
-        :param note: Optional note (e.g., 'Strategy Signal')
+        Args:
+            date (pd.Timestamp): Trade date.
+            ticker (str): Asset ticker.
+            action (str): 'BUY' or 'SELL'.
+            shares (int): Number of shares.
+            price (float): Trade price per share.
+            note (str): Optional trade note.
+        Raises:
+            ValueError: If insufficient cash or shares.
         """
         trade_value = shares * price
         cash_asset = self.positions['CASH']
@@ -116,11 +123,15 @@ class Portfolio:
             return 0
         return self.positions[ticker].shares
 
-    def evaluate_performance(self, benchmark_data: pd.DataFrame) -> Dict[str, float]:
+    def get_portfolio_value(self, prices: Dict[str, float]) -> float:
         """
-        Evaluate portfolio performance using trade logs and benchmark returns.
-
-        :param benchmark_data: DataFrame with 'Close' prices indexed by date
-        :return: Dictionary with performance metrics like Sharpe ratio and Alpha
+        Compute total portfolio value given current prices.
+        Args:
+            prices (Dict[str, float]): Mapping of ticker to price.
+        Returns:
+            float: Total portfolio value.
         """
-        return evaluate_portfolio_performance(self.get_trade_log(), benchmark_data)
+        value = self.get_cash()
+        for ticker in self.tickers:
+            value += self.positions[ticker].shares * prices.get(ticker, 0.0)
+        return value

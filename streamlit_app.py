@@ -30,6 +30,8 @@ tickers = st.sidebar.multiselect("Select Tickers", ["AAPL", "MSFT", "TSLA", "NVD
 start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2023-01-01"))
 end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("2023-12-31"))
 
+benchmark_ticker = st.sidebar.text_input("Benchmark Ticker", value="SPY")
+
 st.sidebar.title("📐 Strategy")
 strategy_type = st.sidebar.selectbox("Strategy", ["momentum", "buy_n_hold"], index=0)
 short_window = st.sidebar.slider("Short MA", 5, 50, 10)
@@ -63,6 +65,24 @@ if run_bt:
     trade_log = bt.get_trade_log()
     equity_curve = bt.get_equity_curve()
     networth_curve = equity_curve['net_worth']
+
+    # --- Benchmark Performance Section ---
+    try:
+        from analytics.performance_evaluator import PerformanceEvaluator
+        import yfinance as yf
+        bench_ticker = benchmark_ticker
+        bench_df = yf.download(bench_ticker, start=str(start_date), end=str(end_date))
+        benchmark_curve = bench_df['Close']
+        benchmark_curve.index = pd.to_datetime(benchmark_curve.index)
+        benchmark_curve = benchmark_curve.reindex(networth_curve.index, method='ffill')
+        evaluator = PerformanceEvaluator(networth_curve, benchmark_curve)
+        perf_metrics = evaluator.compute_metrics()
+        st.subheader(f"📈 Strategy vs. Benchmark: {bench_ticker}")
+        st.line_chart(pd.DataFrame({'Strategy': networth_curve, bench_ticker: benchmark_curve}))
+        st.markdown("**Performance Metrics:**")
+        st.json(perf_metrics, expanded=False)
+    except Exception as e:
+        st.warning(f"Could not compute benchmark performance: {e}")
 
     st.subheader("📋 Trade Log")
     st.dataframe(trade_log)
