@@ -174,3 +174,9 @@ cython_debug/
 .pypirc
 .idea/
 .qodo/
+/data_cache
+/figures
+/logs
+product_roadmap.md
+/run
+/logs
