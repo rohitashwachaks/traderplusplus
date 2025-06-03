@@ -37,6 +37,8 @@ class MarketData:
 
     def get_price(self, ticker: str, date: pd.Timestamp, price_type='Close') -> float | None:
         try:
+            if ticker == 'CASH':
+                return 1.0
             return self.data[ticker].loc[date, price_type]
         except KeyError:
             return None

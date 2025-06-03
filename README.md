@@ -1,4 +1,3 @@
-
 > **Unleash the power of modular, realistic, and extensible portfolio simulation.**
 
 ---
@@ -108,6 +107,38 @@ flowchart TD
 
 ---
 
+## 🏗️ Project Structure & Architecture
+
+- `contracts/` — Core contracts and abstract base classes (Portfolio, StrategyBase, Executor)
+- `core/` — Core logic, execution engines, simulation loop
+- `strategies/` — Example and user strategies (momentum, buy & hold, etc.)
+- `data_ingestion/`, `data_cache/` — Data loaders, adapters, and caching for reproducible research
+- `analytics/`, `ml_engine/` — Analytics, reporting, and ML integrations
+- `dashboard/` — Streamlit/Dash dashboard for visualization
+- `run_backtest.py` — CLI entry point to run backtests
+- `main.py`, `run/` — Additional CLI tools and runners
+
+---
+
+## 🚦 Development Roadmap (Next Steps)
+
+1. **Finalize Core Contracts**
+   - Audit and refine `Portfolio`, `StrategyBase`, and `PortfolioExecutor` for strict modularity and safety (no future leaks).
+2. **Strategy API**
+   - Enforce and document the `generate_signals` interface. Add more example strategies.
+3. **Backtesting Engine**
+   - Expand test coverage and logging in `run_backtest.py` and `core/executors/backtest.py`.
+4. **Data Layer**
+   - Ensure robust, reproducible data ingestion and caching. Document data contracts.
+5. **CLI & Developer Experience**
+   - Improve CLI usability and add clear usage examples.
+6. **Dashboard & Analytics**
+   - Expand analytics and dashboard integration for portfolio and strategy reporting.
+7. **Documentation**
+   - Add docstrings, inline docs, and contribution guidelines for new modules and strategies.
+
+---
+
 ## 🔧 Core Components
 
 | Module            | Purpose                                                                 |
@@ -132,56 +163,34 @@ flowchart TD
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quickstart
 
-```sh
-# Install dependencies
-pip install -r requirements.txt
-
-# Run a backtest
-python run_backtest.py --strategy momentum --tickers AAPL,MSFT --start 2023-01-01 --end 2023-12-31 --plot
-
-# Or use the Streamlit UI
-streamlit run streamlit_app.py
-```
+1. **Install Requirements**
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. **Run a Backtest**
+   ```bash
+   python run_backtest.py --strategy strategies/stock/momentum.py --portfolio configs/sample_portfolio.yaml
+   ```
+3. **Add a New Strategy**
+   - Implement a new class in `strategies/` inheriting from `StrategyBase` and implementing `generate_signals()`.
+   - Register your strategy in your backtest config or CLI.
 
 ---
 
-## 🧩 Project Structure
+## 🤝 Contributing
 
-```text
-📦traderplusplus
-├── contracts
-│   ├── asset.py           # Asset & CashAsset classes
-│   └── portfolio.py       # Portfolio definition
-├── core
-│   ├── backtester.py      # Runs simulation
-│   ├── executor.py        # Executes trades
-│   ├── market_data.py     # Loads, stores & queries market data
-│   ├── data_loader.py     # Yahoo/Polygon loaders + caching
-│   ├── guardrails         # Risk guardrail classes
-│   └── visualizer.py      # Matplotlib + Plotly charts
-├── strategies
-│   ├── base.py            # StrategyBase + factory
-│   └── stock
-│       ├── momentum.py    # Example strategy
-├── analytics
-│   └── performance.py     # Sharpe, Alpha etc.
-├── run_backtest.py        # CLI tool
-└── streamlit_app.py       # UI
-```
+- See the Development Roadmap above for high-priority areas.
+- Add new strategies, data adapters, or analytics modules as composable units.
+- Follow modular design and document your code.
+- PRs and issues welcome!
 
 ---
 
 ## 🌱 Vision for Future Work
 
 See the MVP Roadmap above for our ambitious next steps!
-
----
-
-## 🙌 Contributing
-
-Pull requests and suggestions are welcome! For major changes, please open an issue first to discuss what you’d like to change.
 
 ---
 

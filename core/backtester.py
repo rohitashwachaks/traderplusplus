@@ -37,15 +37,27 @@ class Backtester:
         common_index = common_index.sort_values()
         for current_date in common_index:
             # --- PURE STRATEGY: ONLY GENERATE SIGNALS ---
-            signals = self.strategy.generate_signals(self.market_data, current_date=current_date)
+            signals = self.strategy.generate_signals(self.market_data, current_date=current_date,
+                                                     positions=self.portfolio.positions)
             # --- EXECUTOR: SUBMIT ORDERS BASED ON SIGNALS ---
-            for symbol, signal in signals.items():
-                if signal == 1:
-                    order = Order(symbol=symbol, side=OrderSide.BUY, quantity=1, order_type=OrderType.MARKET)
+            for symbol, order_size in signals.items():
+                if order_size == 0:
+                    continue
+                order_side = OrderSide.BUY if order_size > 0 else OrderSide.SELL
+                if order_side is not None:
+                    order = Order(
+                        symbol=symbol,
+                        side=order_side,
+                        quantity=order_size,
+                        order_type=OrderType.MARKET
+                    )
                     self.executor.submit_order(order)
-                elif signal == -1:
-                    order = Order(symbol=symbol, side=OrderSide.SELL, quantity=1, order_type=OrderType.MARKET)
-                    self.executor.submit_order(order)
+                # if signal == 1:
+                #     order = Order(symbol=symbol, side=OrderSide.BUY, quantity=1, order_type=OrderType.MARKET)
+                #     self.executor.submit_order(order)
+                # elif signal == -1:
+                #     order = Order(symbol=symbol, side=OrderSide.SELL, quantity=1, order_type=OrderType.MARKET)
+                #     self.executor.submit_order(order)
             # --- EXECUTOR: ADVANCE TO NEXT STEP ---
             self.executor.step(current_date)
 

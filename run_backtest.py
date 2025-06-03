@@ -39,7 +39,7 @@ def main():
     if args.strategy not in StrategyFactory.get_supported_strategies():
         raise ValueError(
             f"Unsupported strategy: {args.strategy}. Supported strategies: {StrategyFactory.get_supported_strategies()}")
-    strategy = StrategyFactory.create_strategy(args.strategy, short_window=10, long_window=20)
+    strategy = StrategyFactory.create_strategy(args.strategy)
     ingestion = DataIngestionManager(use_cache=True, force_refresh=args.refresh, source=args.source)
     market_data = MarketData.from_ingestion(tickers, args.start, args.end, ingestion)
     guardrails = [TrailingStopLossGuardrail()]

@@ -59,13 +59,28 @@ if run_bt:
         executor = BacktestExecutor(portfolio=portfolio, market_data=market_data, guardrails=guardrails)
     bt = Backtester(strategy=strategy, market_data=market_data, starting_cash=cash, executor=executor)
     bt.run(tickers, str(start_date), str(end_date))
-    equity_curve = bt.get_equity_curve()
+
     trade_log = bt.get_trade_log()
+    equity_curve = bt.get_equity_curve()
+    networth_curve = equity_curve['net_worth']
+
     st.subheader("📋 Trade Log")
     st.dataframe(trade_log)
     st.subheader("💹 Equity Curve")
-    st.line_chart(equity_curve.set_index("date")["net_worth"])
+    st.line_chart(networth_curve)
     st.subheader("📉 Drawdown")
-    plot_drawdown(equity_curve)
+    plot_drawdown(networth_curve)
     st.subheader("📊 Metrics")
-    st.write(summarize_metrics(equity_curve, trade_log))
+
+    metrics = summarize_metrics(equity_curve, trade_log, dashboard=True)
+    st.subheader(f"📊 Performance Summary:")
+    st.markdown("---")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Sharpe Ratio", f"{metrics['sharpe']:.2f}")
+    col2.metric("Max Drawdown", f"{metrics['mdd']:.2%}")
+    col3.metric("CAGR", f"{metrics['cagr']:.2%}")
+
+    col4, col5 = st.columns(2)
+    col4.metric("Win Rate", f"{metrics['win']:.2%}")
+    col5.metric("Total Trades", metrics['trade_count'])
+    # st.write(summarize_metrics(equity_curve, trade_log))

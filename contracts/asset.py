@@ -7,6 +7,10 @@ class Asset:
         self.shares = shares
         self.trade_history = []
 
+    @property
+    def balance(self):
+        return self.shares
+
     def buy(self, quantity: int):
         self.shares += quantity
 

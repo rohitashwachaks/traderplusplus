@@ -59,12 +59,14 @@ class BacktestExecutor(BaseExecutor):
                                                        message='Guardrail blocked order')
                     continue
             try:
-                if order.side.name == 'BUY':
-                    self.portfolio.execute_trade(current_time, order.symbol, 'BUY', fill_qty, avg_fill_price,
-                                                 note='Backtest Fill')
-                else:
-                    self.portfolio.execute_trade(current_time, order.symbol, 'SELL', fill_qty, avg_fill_price,
-                                                 note='Backtest Fill')
+                self.portfolio.execute_trade(current_time, order.symbol, order.side.name, fill_qty, avg_fill_price,
+                                             note='Backtest Fill')
+                # if order.side.name == 'BUY':
+                #     self.portfolio.execute_trade(current_time, order.symbol, 'BUY', fill_qty, avg_fill_price,
+                #                                  note='Backtest Fill')
+                # else:
+                #     self.portfolio.execute_trade(current_time, order.symbol, 'SELL', fill_qty, avg_fill_price,
+                #                                  note='Backtest Fill')
                 self.order_status[order_id] = OrderStatus.FILLED
                 self.fills[order_id] = OrderResult(order_id=order_id, status=OrderStatus.FILLED,
                                                    filled_quantity=fill_qty, avg_fill_price=avg_fill_price)
@@ -80,6 +82,8 @@ class BacktestExecutor(BaseExecutor):
             if price is not None:
                 net_worth += shares * price
 
+        if net_worth != 50000:
+            print('wth')
         self.equity_curve.append({'date': current_time, 'net_worth': net_worth})
 
     def get_equity_curve(self):

@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import pandas as pd
 from typing import Dict
 
+from contracts.asset import Asset, CashAsset
 from core.market_data import MarketData
 
 
@@ -18,15 +19,15 @@ class StrategyBase(ABC):
         self,
         market_data: MarketData,
         current_date: pd.Timestamp,
-        lookback_window: int = 60
+        positions: Dict[str, Asset | CashAsset]
     ) -> Dict[str, int]:
         """
-        For each asset (ticker), return the current trading signal.
-        Output: { 'AAPL': 1, 'MSFT': -1, 'SPY': 0 }
+        For each asset (ticker), return the Number of shares to buy or sell.
+        Output: { 'AAPL': 1, 'MSFT': -5, 'SPY': 0 }
         Each signal should be:
-        - 1 for Buy
-        - -1 for Sell
-        - 0 for Hold
+        - >0 : Long (number of shares to buy)
+        - <0 : Short (number of shares to sell)
+        - 0 : No action (hold)
         Strategy must not look ahead beyond `current_date`.
         """
         pass

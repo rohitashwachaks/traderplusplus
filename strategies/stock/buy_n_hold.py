@@ -3,13 +3,14 @@ from typing import Dict
 
 import pandas as pd
 
+from contracts.asset import Asset, CashAsset
 from core.market_data import MarketData
 from strategies.stock.base import StrategyBase, StrategyFactory
 
 
 @StrategyFactory.register("buy_n_hold")
 class BuyNHoldStrategy(StrategyBase, ABC):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.has_bought = set()
 
     def get_name(self) -> str:
@@ -21,17 +22,31 @@ class BuyNHoldStrategy(StrategyBase, ABC):
             "name": self.get_name()
         }
 
-    def generate_signals(
-            self,
-            market_data: MarketData,
-            current_date: pd.Timestamp,
-            lookback_window: int = 60
-    ) -> Dict[str, int]:
-        signals = {}
-        for ticker in market_data.get_available_symbols():
-            if ticker not in self.has_bought:
-                signals[ticker] = 1
-                self.has_bought.add(ticker)
-            else:
-                signals[ticker] = 0
+    def generate_signals(self, market_data: MarketData, current_date: pd.Timestamp,
+                         positions: Dict[str, Asset | CashAsset]) -> Dict[str, int]:
+        """
+        Evenly distribute cash across all assets in the portfolio.
+        :param **kwargs:
+        :param market_data:
+        :param current_date:
+        :param positions:
+        :return:
+        """
+        networth = sum(
+            asset.balance * market_data.get_price(asset.ticker, current_date)
+            for ticker, asset in positions.items()
+        )
+
+        allocation_per_asset = networth / len([ticker for ticker in positions if isinstance(positions[ticker], Asset)])
+
+        desired_allocation = {
+            ticker: allocation_per_asset // market_data.get_price(ticker, current_date)
+            for ticker in positions if isinstance(positions[ticker], Asset)
+        }
+
+        signals = {
+            ticker: int(desired_allocation[ticker] - positions[ticker].shares)
+            for ticker in desired_allocation
+        }
+
         return signals
