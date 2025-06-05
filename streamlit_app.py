@@ -59,7 +59,7 @@ if run_bt:
         executor = PaperExecutor(portfolio=portfolio, slippage=slippage, market_data=market_data)
     else:
         executor = BacktestExecutor(portfolio=portfolio, market_data=market_data, guardrails=guardrails)
-    bt = Backtester(strategy=strategy, market_data=market_data, starting_cash=cash, executor=executor)
+    bt = Backtester(strategy=strategy, market_data=market_data, portfolio=portfolio, executor=executor)
     bt.run(tickers, str(start_date), str(end_date))
 
     trade_log = bt.get_trade_log()

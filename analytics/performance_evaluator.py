@@ -91,7 +91,7 @@ class PerformanceEvaluator:
 
         return metrics
 
-    def summary(self, as_str: bool = True) -> str:
+    def summary(self, as_str: bool = True) -> str | dict[str, float]:
         metrics = self.compute_metrics()
         if as_str:
             return '\n'.join(f"{k}: {v:.4f}" for k, v in metrics.items())

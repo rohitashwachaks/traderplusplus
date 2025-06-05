@@ -1,13 +1,30 @@
 # Trader++ Technical Reference & Builder's Guide
 
+<p align="center">
+  <img src="./assets/trader_pp_logo.png" alt="Trader++ Logo" width="100%" style="object-fit:cover;height:300px;object-position:center;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.10);" />
+</p>
+
 ---
+
+> 💡 Why Trader++?
+>
+> I built Trader++ because I wanted a tool that didn’t lie to me.
+>
+> I needed something that could:
+> - Let me write strategies quickly
+> - Simulate realistically
+> - Go from backtest → paper → live with zero rewrites
+> - Show me how my portfolio’s actually doing, not just fake gains
+>
+> Existing tools? Clunky. Proprietary. Not programmable enough.
+>
+> So I built it — for myself first. Now, it’s for every quant who thinks like a developer.
 
 ## ✨ Vision
 
-**Trader++** is a modular, open-source, Python-native trading infrastructure platform built to empower independent quant developers, technical traders, and advanced retail investors.
+**Trader++** is a modular, open-source, Python-native trading infrastructure platform built to empower independent quant developers, technical traders, and advanced retail investors.
 
 > "We’re not building a toy. We’re building programmable capital."
-> 
 
 The goal is to democratize high-quality trading infrastructure through a developer-first experience that rivals institutional tooling, while enabling end-to-end strategy development, backtesting, and (eventually) live execution.
 
@@ -25,7 +42,7 @@ The goal is to democratize high-quality trading infrastructure through a develop
 
 ## 🔧 System Architecture
 
-### 1. `Portfolio`
+### 1. `Portfolio`
 
 Encapsulates:
 
@@ -34,26 +51,25 @@ Encapsulates:
 - Handles position updates and trade logging
 - No access to market data or future prices
 
-### 2. `StrategyBase`
+### 2. `StrategyBase`
 
 Defines a contract:
 
 ```python
 @generate_signals(market_data: MarketData, current_date: pd.Timestamp, lookback_window: int) -> Dict[str, int]
-
 ```
 
 - Must return: { 'AAPL': 1, 'MSFT': -1, 'SPY': 0 }
 - No future data access
 - Stateless OR maintain internal state if needed (e.g., rolling beta)
 
-### 3. `PortfolioExecutor`
+### 3. `PortfolioExecutor`
 
 - Owns market data, guardrails, and the portfolio
 - Responsible for looping over dates, querying strategy for signals, computing allocations, executing trades, and updating equity
 - Strict separation of concerns
 
-### 4. `MarketData`
+### 4. `MarketData`
 
 - Fully encapsulated cacheable, queryable data layer
 - Exposes:
@@ -62,15 +78,14 @@ Defines a contract:
 .get_series(ticker) -> pd.DataFrame
 .get_price(ticker, date) -> float
 .get_history(ticker, date, window) -> pd.DataFrame
-
 ```
 
-### 5. `Guardrails`
+### 5. `Guardrails`
 
 - Optional risk-control layer (e.g., trailing stop-loss)
 - Can unregister tickers from being traded
 
-### 6. `Analytics`
+### 6. `Analytics`
 
 - Generates metrics like Sharpe, Alpha, Max Drawdown, CAGR
 - Relies on equity curve and benchmark data
@@ -114,14 +129,14 @@ Defines a contract:
 ### **Phase 1: MVP Completion**
 
 - [x]  Finalize CLI + backtest
-- [x]  Add `benchmark` support
+- [x]  Add `benchmark` support
 - [x]  Complete strategy abstraction
 - [x]  Public release with docs
 
 ### **Phase 2: Portfolio Reconstitution + Screeners**
 
 - [ ]  Add screener module: e.g., top 10 most volatile stocks past quarter
-- [ ]  Portfolio class supports dynamic `update_tickers()`
+- [ ]  Portfolio class supports dynamic `update_tickers()`
 - [ ]  Reconstitute every N days/months
 
 ### **Phase 3: Web + SaaS Layer**
@@ -174,7 +189,7 @@ Defines a contract:
 - No portfolio object can access market data directly
 - No strategy can see the future
 - No executor should mutate state outside the portfolio
-- All trades must go through `portfolio.execute_trade()` for accounting
+- All trades must go through `portfolio.execute_trade()` for accounting
 
 ---
 
@@ -186,7 +201,6 @@ traderpp backtest --strategy momentum \
                  --start 2022-01-01 \
                  --end 2022-12-31 \
                  --output ./logs
-
 ```
 
 ---
@@ -200,6 +214,7 @@ Trader++ isn’t just another trading framework. It is:
 - A set of powerful abstractions you can scale
 - A wedge into quant SaaS for power users
 
-If executed correctly, it becomes the **Vercel for quant trading**.
+If executed correctly, it becomes the **Vercel for quant trading**.
 
 Now get back to shipping.
+

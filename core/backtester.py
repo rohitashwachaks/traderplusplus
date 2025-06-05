@@ -1,21 +1,32 @@
 from typing import List
 import pandas as pd
+
+from core.executors.base import BaseExecutor
 from core.market_data import MarketData
 from contracts.portfolio import Portfolio
 from contracts.order import Order, OrderSide, OrderType
+from strategies.stock import StrategyBase
 
 
 class Backtester:
-    def __init__(self, strategy, market_data: MarketData, starting_cash=100000.0, executor=None, **executor_kwargs):
+    """
+    Backtester runs a backtest using a given strategy, market data, and portfolio.
+    It generates trading signals based on the strategy and submits orders to the executor.
+    The executor handles order execution and portfolio updates.
+    It does not handle analytics or performance evaluation directly.
+    The backtester is designed to be flexible and can work with any strategy that implements the StrategyBase interface.
+    It can also be used with different executors, such as BacktestExecutor or PaperExecutor.
+    The backtester runs through the specified date range, generating signals for each ticker and executing trades accordingly.
+    """
+    def __init__(self, strategy: 'StrategyBase',
+                 market_data: MarketData,
+                 portfolio: Portfolio,
+                 executor: 'BaseExecutor',
+                 **executor_kwargs):
         self.strategy = strategy
         self.market_data = market_data
-        self.portfolio = Portfolio(
-            name="BacktestPortfolio",
-            tickers=market_data.get_available_symbols(),
-            starting_cash=starting_cash,
-            strategy=strategy,
-            metadata={"source": "Backtester"}
-        )
+        self.portfolio = portfolio
+
         if executor is not None:
             self.executor = executor
         else:

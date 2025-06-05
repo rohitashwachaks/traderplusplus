@@ -9,6 +9,13 @@ import uuid
 
 
 class BacktestExecutor(BaseExecutor):
+    """
+    BacktestExecutor simulates order execution in a backtesting environment.
+    It processes orders based on historical market data and portfolio state.
+    It supports order submission, cancellation, and tracking of order status and fills.
+    It does not interact with any live market or broker API.
+    Instead, it simulates order execution by filling orders at historical prices.
+    """
     def __init__(self, portfolio: Portfolio, market_data: MarketData, guardrails=None):
         self.portfolio = portfolio
         self.market_data = market_data

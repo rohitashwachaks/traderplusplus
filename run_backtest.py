@@ -55,7 +55,7 @@ def main():
     guardrails = [TrailingStopLossGuardrail()]
     portfolio = Portfolio(
         name=f"{args.strategy.capitalize()}Portfolio",
-        tickers=market_data.get_available_symbols(),
+        tickers=tickers,
         benchmark=args.benchmark,
         starting_cash=args.cash,
         strategy=strategy,
@@ -74,7 +74,7 @@ def main():
         executor = LiveExecutor(portfolio=portfolio, broker_api=broker_api, market_data=market_data)
     else:
         executor = BacktestExecutor(portfolio=portfolio, market_data=market_data, guardrails=guardrails)
-    bt = Backtester(strategy=strategy, market_data=market_data, starting_cash=args.cash, executor=executor)
+    bt = Backtester(strategy=strategy, market_data=market_data, portfolio=portfolio, executor=executor)
     bt.run(tickers=tickers, start_date=args.start, end_date=args.end)
     equity_curve = bt.get_equity_curve()
     trade_log = bt.get_trade_log()

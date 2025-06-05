@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./assets/trader_pp_logo.png" alt="Trader++ Logo" width="100%" style="object-fit:cover;height:300px;object-position:center;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.10);" />
+</p>
+
 > **Unleash the power of modular, realistic, and extensible portfolio simulation.**
 
 ---
