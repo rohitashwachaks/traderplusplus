@@ -1,9 +1,10 @@
-from typing import Dict, List
-
 import pandas as pd
+import yfinance as yf
+from typing import Dict, List, Optional
 
 from contracts.asset import Asset, CashAsset
-from strategies.stock.base import StrategyBase
+from contracts.utils import clean_ticker
+from strategies.stock.base import StrategyBase, StrategyFactory
 
 
 class Portfolio:
@@ -13,11 +14,12 @@ class Portfolio:
     """
     def __init__(self,
                  name: str,
-                 tickers: List[str],
+                 tickers: str | List[str],
                  starting_cash: float,
-                 strategy: StrategyBase,
+                 strategy: str,
                  benchmark: str = "SPY",
-                 rebalance_freq: str = "monthly",
+                 rebalance_freq: Optional[str] = None,
+                 recomposition_freq: Optional[str] = None,
                  metadata: Dict = None):
         """
         Initialize a Portfolio object.
@@ -25,28 +27,48 @@ class Portfolio:
         Args:
             name (str): Name of the portfolio.
             tickers (List[str]): List of asset tickers.
-            starting_cash (float): Initial cash balance.
+            starting_cash (float): Initial cash shares.
             strategy (StrategyBase): Strategy instance to generate signals.
             benchmark (str): Benchmark ticker for reference only.
-            rebalance_freq (str): Rebalancing frequency (e.g., 'monthly').
+            rebalance_freq (str, optional): Rebalancing frequency (e.g., 'monthly', 'quarterly', 'annually').
+            recomposition_freq (str, optional): Frequency for recomposition (e.g., 'monthly', 'quarterly', 'annually').
             metadata (Dict, optional): Additional metadata.
         """
+        # Initialize Portfolio name
+        assert (isinstance(name, str) and not name.strip()), "Portfolio name must be a non-empty string"
         self.name = name
-        self.tickers = tickers
-        self.strategy = strategy
-        self.benchmark = benchmark
-        self.rebalance_freq = rebalance_freq
-        self.metadata = metadata or {}
 
-        self.positions: Dict[str, Asset | CashAsset] = {
+        # Initialize tickers
+        if isinstance(tickers, str):
+            tickers = [clean_ticker(ticker) for ticker in tickers.split(",")]
+        assert isinstance(tickers, list), "tickers must be a list or comma-separated string"
+        self.tickers = tickers
+
+        # Initialize strategy
+        assert strategy in StrategyFactory.get_supported_strategies(), f"Unsupported strategy: {strategy}. Supported strategies: {StrategyFactory.get_supported_strategies()}"
+        self.strategy = StrategyFactory.create_strategy(strategy)
+
+        # Initialise benchmark
+        benchmark = clean_ticker(benchmark)
+        assert isinstance(benchmark, str), "Benchmark must be a string"
+        self.benchmark = benchmark
+
+        self._positions: Dict[str, Asset | CashAsset] = {
             ticker: Asset(ticker)
             for ticker in tickers
         }
-        self.positions['CASH'] = CashAsset(starting_cash)
+        self._cash = CashAsset(starting_cash)
+
         self.trade_log: List[dict] = []
         self.position_history: Dict[str, List[int]] = {}
 
-    def execute_trade(self, date: pd.Timestamp, ticker: str, action: str, shares: int, price: float, note: str = 'Strategy Signal'):
+        self.rebalance_freq = rebalance_freq
+        self.recomposition_freq = recomposition_freq
+        self.metadata = metadata or {}
+
+    def execute_trade(self, date: pd.Timestamp, ticker: str,
+                      action: str, shares: int, price: float,
+                      note: str = 'Strategy Signal'):
         """
         Execute a trade and update portfolio positions and cash.
 
@@ -61,12 +83,11 @@ class Portfolio:
             ValueError: If insufficient cash or shares.
         """
         trade_value = shares * price
-        cash_asset = self.positions['CASH']
 
         if action == 'BUY':
-            if cash_asset.balance < trade_value:
+            if self.cash < trade_value:
                 raise ValueError(f"Insufficient cash to buy {shares} shares of {ticker}")
-            cash_asset.withdraw_cash(trade_value)
+            self._cash.withdraw_cash(trade_value)
             self.update_position(ticker, shares)
 
         elif action == 'SELL':
@@ -74,15 +95,15 @@ class Portfolio:
             if held < shares:
                 raise ValueError(f"Trying to sell more shares than held for {ticker}")
             self.update_position(ticker, -shares)
-            cash_asset.deposit_cash(trade_value)
+            self._cash.deposit_cash(trade_value)
 
         else:
             raise ValueError("Action must be either 'BUY' or 'SELL'")
 
-        self.add_trade(date, ticker, action, shares, price, cash_asset.balance, note)
+        self.add_trade(date, ticker, action, shares, price, self._cash.shares, note)
 
     def get_cash(self) -> float:
-        return self.positions['CASH'].balance
+        return self.positions['CASH'].shares
 
     def add_trade(self, date, ticker, action, shares, price, cash_remaining, note=''):
         entry = {
@@ -135,3 +156,25 @@ class Portfolio:
         for ticker in self.tickers:
             value += self.positions[ticker].shares * prices.get(ticker, 0.0)
         return value
+
+    # region Properties
+
+    @property
+    def cash(self) -> float:
+        """
+        Get the current cash shares in the portfolio.
+        Returns:
+            float: Current cash shares.
+        """
+        return self.positions['CASH'].shares
+
+    @property
+    def positions(self) -> dict:
+        """
+        Get the current positions in the portfolio.
+        Returns:
+            dict: Dictionary of asset ticker to Asset object.
+        """
+        return self.positions
+
+    # endregion Properties

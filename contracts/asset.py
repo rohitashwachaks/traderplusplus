@@ -1,6 +1,8 @@
 from abc import ABC
 from typing import Type, Optional
 
+from contracts.utils import clean_ticker
+
 
 class AssetBase(ABC):
     """
@@ -12,48 +14,55 @@ class AssetBase(ABC):
 
     def __init__(self, ticker: str, shares: int | float = 0):
         assert isinstance(ticker, str), "Ticker must be a string"
-        self._ticker = ticker.strip().strip('^').upper()
+        self._ticker = clean_ticker(ticker)
 
         assert isinstance(shares, self.asset_type), f"Shares must be an {self.asset_type.__name__}"
-        self._shares = shares
+        self._shares: int | float = shares
         self._trade_history: Optional[list] = None  # List to store trade history
 
     def __repr__(self):
         return f"{self.__class__.__name__}(ticker={self._ticker}, shares={self.shares})"
 
-    def buy(self, quantity: int | float):
+    def buy(self, shares: int | float):
         """
         Buy a specified quantity of the asset.
-        :param quantity: Number of shares to buy.
+        :param shares: Number of shares to buy.
         """
         # Type check based on the class's asset_type
-        if not isinstance(quantity, self.asset_type):
-            raise TypeError(f"Quantity must be of type {self.asset_type.__name__}")
+        assert isinstance(shares, self.asset_type), TypeError(f"Quantity must be of type {self.asset_type.__name__}")
+        assert shares <= 0, ValueError("Cannot buy a negative quantity")
+        self._shares += shares
 
-        if quantity <= 0:
-            raise ValueError("Cannot buy a negative quantity")
-        self._shares += quantity
-
-    def sell(self, quantity: int | float):
+    def sell(self, shares: int | float):
         """
         Sell a specified quantity of the asset.
         (Short selling is not allowed in this base class)
-        :param quantity: Number of shares to sell.
+        :param shares: Number of shares to sell.
         """
         # Type check based on the class's asset_type
-        if not isinstance(quantity, self.asset_type):
-            raise TypeError(f"Quantity must be of type {self.asset_type.__name__}")
+        assert isinstance(shares, self.asset_type), TypeError(f"Quantity must be of type {self.asset_type.__name__}")
+        assert shares > self._shares, ValueError("Cannot sell more than held quantity")
+        self._shares -= shares
 
-        if quantity > self._shares:
-            raise ValueError("Cannot sell more than held quantity")
-        self._shares -= quantity
+    # region Properties
 
     @property
-    def shares(self):
+    def ticker(self) -> str:
+        return self._ticker
+
+    @property
+    def shares(self) -> int | float:
         return self._shares
 
+    @property
     def is_empty(self):
         return self.shares == 0
+
+    @property
+    def trade_history(self):
+        return self._trade_history
+
+    # endregion Properties
 
 
 class Asset(AssetBase):
