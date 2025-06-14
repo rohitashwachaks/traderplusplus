@@ -157,7 +157,7 @@ flowchart TD
 
 ## 💡 Main Features
 
-- 📈 **Backtesting Engine** — Realistic execution, guardrails, cash balance checks
+- 📈 **Backtesting Engine** — Realistic execution, guardrails, cash shares checks
 - 🧠 **Pluggable Strategy Interface** — Stateful/stateless signal generation
 - 💼 **Portfolio Tracking** — Accurate PnL with trade logs, equity curves
 - 🛡️ **Guardrail System** — Risk management hooks (stop-loss, asset unregister)

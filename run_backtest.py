@@ -11,8 +11,6 @@ from strategies.stock.base import StrategyFactory
 from utils.metrics import summarize_metrics
 from contracts.portfolio import Portfolio
 from core.executors.backtest import BacktestExecutor
-from core.executors.paper import PaperExecutor
-from core.executors.live import LiveExecutor
 
 from analytics.performance_evaluator import PerformanceEvaluator
 import yfinance as yf
@@ -40,46 +38,39 @@ def parse_args():
 
 def main():
     args = parse_args()
-    tickers = [s.strip().upper() for s in args.tickers.split(",")]
-    if args.strategy not in StrategyFactory.get_supported_strategies():
-        raise ValueError(
-            f"Unsupported strategy: {args.strategy}. Supported strategies: {StrategyFactory.get_supported_strategies()}")
-    strategy = StrategyFactory.create_strategy(args.strategy)
-    ingestion = DataIngestionManager(use_cache=True, force_refresh=args.refresh, source=args.source)
 
-    benchmark = args.benchmark.upper()
-    if benchmark.startswith("^"):
-        benchmark = benchmark[1:]  # Remove caret for yfinance compatibility
-
-    market_data = MarketData.from_ingestion(tickers+[benchmark], args.start, args.end, ingestion)
-    guardrails = [TrailingStopLossGuardrail()]
+    # --- Portfolio Setup ---
     portfolio = Portfolio(
-        name=f"{args.strategy.capitalize()}Portfolio",
-        tickers=tickers,
+        name=f"{args.strategy.capitalize()}-Portfolio",
+        tickers=args.tickers,
         benchmark=args.benchmark,
         starting_cash=args.cash,
-        strategy=strategy,
+        strategy=args.strategy,
         metadata={"source": f"{args.mode.capitalize()}Executor"}
     )
-    if args.mode == "paper":
-        executor = PaperExecutor(portfolio=portfolio, slippage=args.slippage, market_data=market_data)
-    elif args.mode == "live":
-        if not args.broker:
-            raise ValueError("--broker must be specified for live trading mode (e.g. brokers.alpaca.AlpacaBrokerAPI)")
-        # Dynamically import the broker API module
-        import importlib
-        broker_module, broker_class = args.broker.rsplit('.', 1)
-        broker_api_cls = getattr(importlib.import_module(broker_module), broker_class)
-        broker_api = broker_api_cls()  # User must configure credentials in the broker API implementation
-        executor = LiveExecutor(portfolio=portfolio, broker_api=broker_api, market_data=market_data)
-    else:
-        executor = BacktestExecutor(portfolio=portfolio, market_data=market_data, guardrails=guardrails)
+    tickers = portfolio.tickers
+    benchmark = portfolio.benchmark
+    strategy = portfolio.strategy
+
+    # --- Market Data Setup ---
+    ingestion = DataIngestionManager(source=args.source)
+    market_data = MarketData(ingestion, simulation_start_date=args.start)
+
+    # --- Executor Setup ---
+    guardrails = [TrailingStopLossGuardrail()]
+    executor = BacktestExecutor(portfolio=portfolio, market_data=market_data, guardrails=guardrails)
+
+    # --- Backtester Setup ---
     bt = Backtester(strategy=strategy, market_data=market_data, portfolio=portfolio, executor=executor)
-    bt.run(tickers=tickers, start_date=args.start, end_date=args.end)
-    equity_curve = bt.get_equity_curve()
-    trade_log = bt.get_trade_log()
+    bt.run(start_date=args.start, end_date=args.end)
+
+    # --- Backtest Results ---
+    print(f"\n🚀 Backtest completed for {portfolio.name} with {len(tickers)} tickers from {args.start} to {args.end}")
     print(f"\n💰 Starting Cash: ${args.cash:,.2f}")
     print(f"\n📈 Final Net Worth: ${bt.get_final_net_worth():,.2f}")
+
+    equity_curve = bt.get_equity_curve()
+    trade_log = bt.get_trade_log()
     if args.export:
         os.makedirs('./logs', exist_ok=True)
         equity_curve.to_csv("./logs/equity_curve.csv")

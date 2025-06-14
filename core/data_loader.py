@@ -69,7 +69,7 @@ class DataIngestionManager:
         self.force_refresh = force_refresh
         self.source = source
 
-    def get_data(self, tickers: List[str], start_date: str, end_date: str) -> Dict[str, pd.DataFrame]:
+    def get_data(self, tickers: List[str], start_date: str, end_date: str) -> Dict[str, pd.DataFrame] | pd.DataFrame:
         """
         Return a dictionary of {ticker: DataFrame} for all requested tickers.
 
@@ -81,6 +81,15 @@ class DataIngestionManager:
         Returns:
             Dict[str, pd.DataFrame]: A dictionary containing the historical OHLCV data for each ticker.
         """
+        # TODO: Convert Dict structure to a single Multi-indexed dataframe?
+        # data = load_price_data(
+        #         tickers,
+        #         start_date,
+        #         end_date,
+        #         use_cache=self.use_cache,
+        #         force_refresh=self.force_refresh,
+        #         source=self.source
+        #     )
         data = {}
         for ticker in tickers:
             data[ticker] = load_price_data(

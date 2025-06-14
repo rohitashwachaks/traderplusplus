@@ -1,6 +1,6 @@
 from typing import List
 import pandas as pd
-
+from core.executors.backtest import BacktestExecutor
 from core.executors.base import BaseExecutor
 from core.market_data import MarketData
 from contracts.portfolio import Portfolio
@@ -23,33 +23,49 @@ class Backtester:
                  portfolio: Portfolio,
                  executor: 'BaseExecutor',
                  **executor_kwargs):
+        """
+        :param strategy:
+        :param market_data:
+        :param portfolio:
+        :param executor:
+        :param executor_kwargs:
+        """
         self.strategy = strategy
         self.market_data = market_data
         self.portfolio = portfolio
+        self.executor = executor
 
-        if executor is not None:
-            self.executor = executor
-        else:
-            from core.executors.backtest import BacktestExecutor
-            self.executor = BacktestExecutor(portfolio=self.portfolio, market_data=market_data, **executor_kwargs)
-        self.tickers = []
+        self.tickers = portfolio.tickers
         self.start_date = None
         self.end_date = None
         self.signals = {}
 
-    def run(self, tickers: List[str], start_date: str, end_date: str):
-        self.tickers = tickers
-        self.start_date = start_date
-        self.end_date = end_date
-        price_frames = [self.market_data.get_series(tic) for tic in tickers]
-        common_index = price_frames[0].index
-        for df in price_frames[1:]:
-            common_index = common_index.intersection(df.index)
-        common_index = common_index.sort_values()
-        for current_date in common_index:
+    def run(self, start_date: str, end_date: str):
+        self.start_date = pd.to_datetime(start_date)
+        self.end_date = pd.to_datetime(end_date)
+
+        # Fetch market data for all tickers
+        # check for strategy lok-back period, if any, and adjust start_date accordingly
+        if hasattr(self.strategy, 'lookback_period'):
+            lookback_period = self.strategy.lookback_period
+            if isinstance(lookback_period, int):
+                # Convert lookback period to a date offset
+                start_date = (pd.to_datetime(start_date) - pd.DateOffset(days=(self.strategy.lookback_period+1))).strftime('%Y-%m-%d')
+            else:
+                raise ValueError("lookback_period must be an integer representing days")
+        self.market_data.get_market_data(self.tickers + [self.portfolio.benchmark],
+                                         start_date=start_date, end_date=end_date)
+
+        # Iterate through the common index dates
+        for current_date in self.market_data.dates:
+            # Generate slice of
+            # --- MARKET DATA: FETCH HISTORICAL DATA FOR ALL TICKERS ---
+            # current_date = pd.to_datetime(current_date)
+            historical_data = self.market_data.get_history(self.tickers, end_date=current_date, lookback=self.strategy.lookback_period)
+
             # --- PURE STRATEGY: ONLY GENERATE SIGNALS ---
-            signals = self.strategy.generate_signals(self.market_data, current_date=current_date,
-                                                     positions=self.portfolio.positions)
+            signals = self.strategy.generate_signals(historical_data, current_date=current_date,
+                                                     positions=self.portfolio.positions, cash=self.portfolio.cash)
             # --- EXECUTOR: SUBMIT ORDERS BASED ON SIGNALS ---
             for symbol, order_size in signals.items():
                 if order_size == 0:

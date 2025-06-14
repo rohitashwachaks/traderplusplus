@@ -11,6 +11,10 @@ class StrategyBase(ABC):
     Abstract base class for trading strategies.
     All strategies must implement get_name and generate_signals.
     """
+
+    def __init__(self):
+        self.lookback_period = None
+
     @abstractmethod
     def get_name(self) -> str:
         """
@@ -18,12 +22,21 @@ class StrategyBase(ABC):
         """
         pass
 
+    @property
+    def lookback(self) -> int:
+        """
+        Return the lookback period in days for the strategy.
+        :return:
+        """
+        return self.lookback_period
+
     @abstractmethod
     def generate_signals(
         self,
-        market_data: 'MarketData',
+        market_data: pd.DataFrame | Dict[str, pd.DataFrame],
         current_date: pd.Timestamp,
-        positions: Dict[str, Asset | CashAsset]
+        positions: Dict[str, Asset],
+        cash: CashAsset
     ) -> Dict[str, int]:
         """
         For each asset (ticker), return the Number of shares to buy or sell.
@@ -33,6 +46,7 @@ class StrategyBase(ABC):
         - <0 : Short (number of shares to sell)
         - 0 : No action (hold)
         Strategy must not look ahead beyond `current_date`.
+        :param cash:
         """
         pass
 

@@ -81,7 +81,7 @@ class BacktestExecutor(BaseExecutor):
                 self.order_status[order_id] = OrderStatus.REJECTED
                 self.fills[order_id] = OrderResult(order_id=order_id, status=OrderStatus.REJECTED, message=str(e))
         # Track equity
-        net_worth = self.portfolio.positions['CASH'].balance
+        net_worth = self.portfolio.positions['CASH'].shares
 
         for ticker in self.portfolio.tickers:
             shares = self.portfolio.positions[ticker].shares

@@ -27,12 +27,13 @@ class MomentumStrategy(StrategyBase, ABC):
         }
 
     def generate_signals(self, market_data: MarketData, current_date: pd.Timestamp,
-                         positions: Dict[str, Asset | CashAsset]) -> Dict[str, int]:
+                         positions: Dict[str, Asset | CashAsset], cash) -> Dict[str, int]:
         """
         Generate signals for all tickers based on moving average crossover.
+        :param cash:
         """
         signals = {}
-        cash_per_asset = positions['CASH'].balance / len([ticker for ticker in positions if isinstance(positions[ticker], Asset)])
+        cash_per_asset = positions['CASH'].shares / len([ticker for ticker in positions if isinstance(positions[ticker], Asset)])
         for ticker in market_data.get_available_symbols():
             # history = market_data.get_history(ticker, end_date=current_date, lookback=self.lookback_window)
             history = market_data.get_history(ticker, end_date=current_date, lookback=self.long_window+1)
