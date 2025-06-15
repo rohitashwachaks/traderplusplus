@@ -13,9 +13,9 @@ class CAPMStrategy(StrategyBase):
     def get_name(self) -> str:
         return "CAPM Portfolio Strategy"
 
-    def generate_signals(self, market_data: Dict[str, pd.DataFrame], cash) -> Dict[str, pd.DataFrame]:
+    def generate_signals(self, price_data: Dict[str, pd.DataFrame], current_date) -> Dict[str, pd.DataFrame]:
         signals = {}
-        for ticker, df in market_data.items():
+        for ticker, df in price_data.items():
             df = df.copy()
             df['signal'] = 0  # Placeholder for CAPM signals
             df['position'] = 0  # Placeholder for positions

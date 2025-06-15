@@ -1,5 +1,7 @@
 from typing import List
 import pandas as pd
+from tqdm import tqdm
+
 from core.executors.backtest import BacktestExecutor
 from core.executors.base import BaseExecutor
 from core.market_data import MarketData
@@ -57,36 +59,39 @@ class Backtester:
                                          start_date=start_date, end_date=end_date)
 
         # Iterate through the common index dates
-        for current_date in self.market_data.dates:
-            # Generate slice of
-            # --- MARKET DATA: FETCH HISTORICAL DATA FOR ALL TICKERS ---
-            # current_date = pd.to_datetime(current_date)
-            historical_data = self.market_data.get_history(self.tickers, end_date=current_date, lookback=self.strategy.lookback_period)
+        for current_date in tqdm(self.market_data.dates):
+            try:
+                # Generate slice of
+                # --- MARKET DATA: FETCH HISTORICAL DATA FOR ALL TICKERS ---
+                # current_date = pd.to_datetime(current_date)
+                historical_data = self.market_data.get_history(self.tickers, end_date=current_date, lookback=self.strategy.lookback_period)
 
-            # --- PURE STRATEGY: ONLY GENERATE SIGNALS ---
-            signals = self.strategy.generate_signals(historical_data, current_date=current_date,
-                                                     positions=self.portfolio.positions, cash=self.portfolio.cash)
-            # --- EXECUTOR: SUBMIT ORDERS BASED ON SIGNALS ---
-            for symbol, order_size in signals.items():
-                if order_size == 0:
-                    continue
-                order_side = OrderSide.BUY if order_size > 0 else OrderSide.SELL
-                if order_side is not None:
-                    order = Order(
-                        symbol=symbol,
-                        side=order_side,
-                        quantity=order_size,
-                        order_type=OrderType.MARKET
-                    )
-                    self.executor.submit_order(order)
-                # if signal == 1:
-                #     order = Order(symbol=symbol, side=OrderSide.BUY, quantity=1, order_type=OrderType.MARKET)
-                #     self.executor.submit_order(order)
-                # elif signal == -1:
-                #     order = Order(symbol=symbol, side=OrderSide.SELL, quantity=1, order_type=OrderType.MARKET)
-                #     self.executor.submit_order(order)
-            # --- EXECUTOR: ADVANCE TO NEXT STEP ---
-            self.executor.step(current_date)
+                # --- PURE STRATEGY: ONLY GENERATE SIGNALS ---
+                signals = self.strategy.generate_signals(historical_data, current_date=current_date,
+                                                         positions=self.portfolio.positions, cash=self.portfolio.cash)
+                # --- EXECUTOR: SUBMIT ORDERS BASED ON SIGNALS ---
+                if signals:
+                    for symbol, order_size in signals.items():
+                        if order_size == 0:
+                            continue
+                        order_side = OrderSide.BUY if order_size > 0 else OrderSide.SELL
+                        if order_side is not None:
+                            order = Order(
+                                ticker=symbol,
+                                side=order_side,
+                                quantity=order_size,
+                                order_type=OrderType.MARKET
+                            )
+                            self.executor.submit_order(order)
+
+                # --- EXECUTOR: ADVANCE TO NEXT STEP ---
+                self.executor.step(current_date)
+            except Exception as e:
+                print(f"Error during backtest step for {current_date}: {e}")
+                continue
+
+        # --- EXECUTOR: FINALIZE ---
+        print("Finalizing backtest...")
 
     def get_trade_log(self) -> pd.DataFrame:
         return self.portfolio.get_trade_log()

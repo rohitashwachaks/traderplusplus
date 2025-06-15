@@ -31,7 +31,7 @@ def load_price_data(ticker: str, start_date: str, end_date: str,
     Load historical OHLCV data for a single ticker from the specified data source.
 
     Args:
-        ticker (str): The ticker symbol of the security.
+        ticker (str): The ticker ticker of the security.
         start_date (str): The start date of the data range.
         end_date (str): The end date of the data range.
         use_cache (bool, optional): Whether to use cached data. Defaults to True.

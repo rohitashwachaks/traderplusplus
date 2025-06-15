@@ -6,9 +6,9 @@ import yfinance as yf
 def clean_ticker(ticker):
     """    Validate and format a ticker string.
     Args:
-        ticker (str): Ticker symbol to validate.
+        ticker (str): Ticker ticker to validate.
     Returns:
-        str: Validated and formatted ticker symbol.
+        str: Validated and formatted ticker ticker.
     Raises:
         ValueError: If the ticker is invalid.
     """
@@ -17,9 +17,11 @@ def clean_ticker(ticker):
     ticker = ticker.strip().upper()
     if not ticker.isalpha() or len(ticker) < 1 or len(ticker) > 5:
         raise ValueError(f"Invalid ticker: {ticker}. Tickers must be 1-5 alphabetic characters.")
-    # check if ticker is a valid stock symbol, on yahoo finance
-    try:
-        _ = yf.Ticker(ticker).info  # This will raise an error if ticker is invalid
-    except Exception as e:
-        raise ValueError(f"Invalid ticker: {ticker}. Error: {str(e)}")
+    # check if ticker is a valid stock ticker, on yahoo finance
+    ticker_obj = yf.Ticker(ticker)
+
+    # Option 1: Try fetching recent history (safe and reliable)
+    hist = ticker_obj.history(period="1d")
+    if hist.empty:
+        raise ValueError(f"Invalid ticker: {ticker}. Ticker not found on Yahoo Finance.")
     return ticker

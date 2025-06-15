@@ -46,7 +46,7 @@ class PaperExecutor(BaseExecutor):
         for order_id, order in list(self.orders.items()):
             if self.order_status[order_id] != OrderStatus.SUBMITTED:
                 continue
-            price = self.market_data.get_price(order.symbol, current_time)
+            price = self.market_data.get_price(order.ticker, current_time)
             if price is None:
                 continue
             fill_qty = order.quantity  # For now, assume full fill (can add partial fill logic)
@@ -61,10 +61,10 @@ class PaperExecutor(BaseExecutor):
             # Update portfolio
             try:
                 if order.side.name == 'BUY':
-                    self.portfolio.execute_trade(current_time, order.symbol, 'BUY', fill_qty, avg_fill_price,
+                    self.portfolio.execute_trade(current_time, order.ticker, 'BUY', fill_qty, avg_fill_price,
                                                  note='Paper Fill')
                 else:
-                    self.portfolio.execute_trade(current_time, order.symbol, 'SELL', fill_qty, avg_fill_price,
+                    self.portfolio.execute_trade(current_time, order.ticker, 'SELL', fill_qty, avg_fill_price,
                                                  note='Paper Fill')
                 self.order_status[order_id] = OrderStatus.FILLED
                 self.fills[order_id] = OrderResult(order_id=order_id, status=OrderStatus.FILLED,

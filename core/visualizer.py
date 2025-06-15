@@ -30,11 +30,15 @@ def _finalize_plot(title: str):
     return fig
 
 
-def plot_equity_curve(equity_curve: pd.Series, title: str = "Equity Curve"):
+def plot_equity_curve(equity_curve: pd.Series, benchmark_curve: pd.Series = None, title: str = "Equity Curve"):
     _validate_equity_series(equity_curve)
+    if benchmark_curve is not None:
+        _validate_equity_series(benchmark_curve)
 
     plt.figure(figsize=(10, 4))
     plt.plot(equity_curve, label='Equity', linewidth=2)
+    if benchmark_curve is not None:
+        plt.plot(benchmark_curve, label='Benchmark', linestyle='--', linewidth=2)
     plt.title(title)
     plt.xlabel("Date")
     plt.ylabel("Portfolio Value")
@@ -106,40 +110,6 @@ def plot_equity_with_trades(equity_curve: pd.Series,
     return _finalize_plot(title)
 
 
-def plotly_interactive_equity(equity_curve: pd.Series,
-                              trades: pd.DataFrame = None,
-                              title: str = "Interactive Equity Curve"):
-    _validate_equity_series(equity_curve)
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=equity_curve.index,
-        y=equity_curve.values,
-        mode='lines',
-        name='Net Worth',
-        line=dict(width=2)
-    ))
-
-    if trades is not None:
-        for action in ['BUY', 'SELL']:
-            filtered = trades[trades['action'] == action]
-            fig.add_trace(go.Scatter(
-                x=pd.to_datetime(filtered['date']),
-                y=[equity_curve.get(pd.to_datetime(d), None) for d in filtered['date']],
-                mode='markers',
-                marker=dict(
-                    color='green' if action == 'BUY' else 'red',
-                    symbol='triangle-up' if action == 'BUY' else 'triangle-down',
-                    size=10
-                ),
-                name=action
-            ))
-
-    fig.update_layout(title=title, xaxis_title="Date", yaxis_title="Net Worth")
-    fig.show()
-    return fig
-
-
 def plot_equity_vs_networth(equity_curve: pd.Series,
                             networth_curve: pd.Series,
                             title: str = "Strategy vs Net Worth"):
@@ -172,7 +142,6 @@ def plot_equity_vs_benchmark(
     _validate_equity_series(portfolio_curve)
     _validate_equity_series(benchmark_curve)
     import matplotlib.pyplot as plt
-    import pandas as pd
     # Align indices
     common_idx = portfolio_curve.index.intersection(benchmark_curve.index)
     p_curve = portfolio_curve.loc[common_idx]
@@ -192,6 +161,40 @@ def plot_equity_vs_benchmark(
     return _finalize_plot(title)
 
 
+def plotly_interactive_equity(equity_curve: pd.Series,
+                              trades: pd.DataFrame = None,
+                              title: str = "Interactive Equity Curve"):
+    _validate_equity_series(equity_curve)
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=equity_curve.index,
+        y=equity_curve.values,
+        mode='lines',
+        name='Net Worth',
+        line=dict(width=2)
+    ))
+
+    if trades is not None:
+        for action in ['BUY', 'SELL']:
+            filtered = trades[trades['action'] == action]
+            fig.add_trace(go.Scatter(
+                x=pd.to_datetime(filtered.index),
+                y=equity_curve.loc[filtered.index],
+                mode='markers',
+                marker=dict(
+                    color='green' if action == 'BUY' else 'red',
+                    symbol='triangle-up' if action == 'BUY' else 'triangle-down',
+                    size=10
+                ),
+                name=action
+            ))
+
+    fig.update_layout(title=title, xaxis_title="Date", yaxis_title="Net Worth")
+    fig.show()
+    return fig
+
+
 def plotly_equity_vs_benchmark(
     portfolio_curve: pd.Series,
     benchmark_curve: pd.Series,
@@ -201,8 +204,6 @@ def plotly_equity_vs_benchmark(
     """
     Plotly interactive chart for portfolio vs benchmark.
     """
-    import plotly.graph_objects as go
-    import pandas as pd
     # Align indices
     common_idx = portfolio_curve.index.intersection(benchmark_curve.index)
     p_curve = portfolio_curve.loc[common_idx]
@@ -214,4 +215,5 @@ def plotly_equity_vs_benchmark(
     fig.add_trace(go.Scatter(x=p_curve.index, y=p_curve, mode='lines', name='Strategy'))
     fig.add_trace(go.Scatter(x=b_curve.index, y=b_curve, mode='lines', name='Benchmark'))
     fig.update_layout(title=title, xaxis_title='Date', yaxis_title='Normalized Value' if normalize else 'Value ($)', template='plotly_white')
+    fig.show()
     return fig

@@ -63,11 +63,18 @@ class MarketData:
         self._validate_all_data()
         self._clean_and_align_data()
 
-    def get_price(self, ticker: str, date: pd.Timestamp, price_type='Close') -> float | None:
+    def get_price(self, ticker: str | list[str], date: pd.Timestamp, price_type='Close') -> float | dict[str, float] | None:
+        ticker_list = []
+        if isinstance(ticker, str):
+            ticker_list = [tick.strip().upper() for tick in ticker.split(",")]
+        elif isinstance(ticker, list):
+            ticker_list = ticker
+
+        price = {}
         try:
-            if ticker == 'CASH':
-                return 1.0
-            return self.data[ticker].loc[date, price_type]
+            for tick in ticker_list:
+                price[tick] = self.data[tick].loc[date, price_type]
+            return price
         except KeyError:
             return None
 
@@ -87,7 +94,7 @@ class MarketData:
                 raise ValueError(f"ticker {ticker} not found in market data.")
             if end_date not in self.data[ticker].index:
                 raise ValueError(f"end_date {end_date} not found in market data for ticker {ticker}.")
-            if lookback <= 0:
+            if lookback < 0:
                 raise ValueError("lookback must be a positive integer.")
             if lookback > len(self.data[ticker]):
                 raise ValueError(f"lookback {lookback} exceeds available data length for ticker {ticker}.")

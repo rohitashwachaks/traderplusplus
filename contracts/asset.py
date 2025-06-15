@@ -30,7 +30,7 @@ class AssetBase(ABC):
         """
         # Type check based on the class's asset_type
         assert isinstance(shares, self.asset_type), TypeError(f"Quantity must be of type {self.asset_type.__name__}")
-        assert shares <= 0, ValueError("Cannot buy a negative quantity")
+        assert shares > 0, ValueError("Cannot buy a non-positive quantity")
         self._shares += shares
 
     def sell(self, shares: int | float):
@@ -41,7 +41,7 @@ class AssetBase(ABC):
         """
         # Type check based on the class's asset_type
         assert isinstance(shares, self.asset_type), TypeError(f"Quantity must be of type {self.asset_type.__name__}")
-        assert shares > self._shares, ValueError("Cannot sell more than held quantity")
+        assert shares <= self._shares, ValueError("Cannot sell more than held quantity")
         self._shares -= shares
 
     # region Properties

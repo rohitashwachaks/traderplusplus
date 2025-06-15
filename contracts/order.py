@@ -5,8 +5,8 @@ from datetime import datetime
 
 
 class OrderSide(Enum):
-    BUY = "buy"
-    SELL = "sell"
+    BUY = "BUY"
+    SELL = "SELL"
 
 
 class OrderType(Enum):
@@ -28,9 +28,9 @@ class OrderStatus(Enum):
 
 @dataclass
 class Order:
-    symbol: str
+    ticker: str
     side: OrderSide
-    quantity: float
+    quantity: float | int  # Can be float for fractional shares
     order_type: OrderType = OrderType.MARKET
     limit_price: Optional[float] = None  # Support for limit orders
     stop_price: Optional[float] = None

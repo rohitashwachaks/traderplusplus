@@ -23,31 +23,25 @@ class BuyNHoldStrategy(StrategyBase, ABC):
             "name": self.get_name()
         }
 
-    def generate_signals(self, market_data: pd.DataFrame | Dict[str, pd.DataFrame], current_date: pd.Timestamp,
-                         positions: Dict[str, Asset | CashAsset], cash) -> Dict[str, int]:
+    def generate_signals(self, price_data: pd.DataFrame | Dict[str, pd.DataFrame], current_date: pd.Timestamp,
+                         positions: Dict[str, Asset], cash: float, **kwargs) -> Dict[str, int]:
         """
-        Evenly distribute cash across all assets in the portfolio.
+        Buy once and hold till perpetuity for the strategy.
+        :param price_data: A DataFrame or dict of DataFrames containing price data for each asset.
         :param cash:
         :param **kwargs:
         :param current_date:
         :param positions:
         :return:
         """
-        networth = sum(
-            asset.shares * price_data[asset.ticker].loc[current_date]
-            for ticker, asset in positions.items()
-        )
+        if len(self.has_bought) > 0:
+            # If already bought, no further action
+            return {}
 
-        allocation_per_asset = networth / len([ticker for ticker in positions if isinstance(positions[ticker], Asset)])
+        ticker = list(positions.keys())[0]  # Single ticker strategy
 
-        desired_allocation = {
-            ticker: allocation_per_asset // price_data.get_price(ticker, current_date)
-            for ticker in positions if isinstance(positions[ticker], Asset)
-        }
-
-        signals = {
-            ticker: int(desired_allocation[ticker] - positions[ticker].shares)
-            for ticker in desired_allocation
-        }
-
-        return signals
+        # Allocate all cash to the first asset
+        order_qty = cash // price_data[ticker]['Close'].loc[current_date]
+        if order_qty > 0:
+            return {ticker: int(order_qty)}
+        self.has_bought.add(ticker)

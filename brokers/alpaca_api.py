@@ -40,7 +40,7 @@ class AlpacaBrokerAPI:
         side = order.side.name.lower()
         type_ = order.order_type.name.lower()
         data = {
-            "symbol": order.symbol,
+            "ticker": order.ticker,
             "qty": order.quantity,
             "side": side,
             "type": type_,

@@ -52,7 +52,9 @@ class BacktestExecutor(BaseExecutor):
         for order_id, order in list(self.orders.items()):
             if self.order_status[order_id] != OrderStatus.SUBMITTED:
                 continue
-            price = self.market_data.get_price(order.symbol, current_time)
+
+            price = self.market_data.get_price(order.ticker, current_time)[order.ticker]
+
             if price is None:
                 continue
             fill_qty = order.quantity
@@ -60,40 +62,30 @@ class BacktestExecutor(BaseExecutor):
             # Guardrails (if any)
             for guardrail in self.guardrails:
                 if hasattr(guardrail, 'evaluate') and not guardrail.evaluate(self.portfolio.positions,
-                                                                             {order.symbol: price}):
+                                                                             {order.ticker: price}):
                     self.order_status[order_id] = OrderStatus.REJECTED
                     self.fills[order_id] = OrderResult(order_id=order_id, status=OrderStatus.REJECTED,
                                                        message='Guardrail blocked order')
                     continue
             try:
-                self.portfolio.execute_trade(current_time, order.symbol, order.side.name, fill_qty, avg_fill_price,
-                                             note='Backtest Fill')
-                # if order.side.name == 'BUY':
-                #     self.portfolio.execute_trade(current_time, order.symbol, 'BUY', fill_qty, avg_fill_price,
-                #                                  note='Backtest Fill')
-                # else:
-                #     self.portfolio.execute_trade(current_time, order.symbol, 'SELL', fill_qty, avg_fill_price,
-                #                                  note='Backtest Fill')
+                self.portfolio.execute_trade(current_time, order, avg_fill_price, note='Backtest Fill')
+
                 self.order_status[order_id] = OrderStatus.FILLED
                 self.fills[order_id] = OrderResult(order_id=order_id, status=OrderStatus.FILLED,
                                                    filled_quantity=fill_qty, avg_fill_price=avg_fill_price)
+
             except Exception as e:
                 self.order_status[order_id] = OrderStatus.REJECTED
                 self.fills[order_id] = OrderResult(order_id=order_id, status=OrderStatus.REJECTED, message=str(e))
+
         # Track equity
-        net_worth = self.portfolio.positions['CASH'].shares
+        price = self.market_data.get_price(self.portfolio.tickers, current_time)
+        net_worth = self.portfolio.net_worth(price)
+        benchmark_price = self.market_data.get_price(self.portfolio.benchmark, current_time)[self.portfolio.benchmark]
 
-        for ticker in self.portfolio.tickers:
-            shares = self.portfolio.positions[ticker].shares
-            price = self.market_data.get_price(ticker, current_time)
-            if price is not None:
-                net_worth += shares * price
-
-        if net_worth != 50000:
-            print('wth')
-        self.equity_curve.append({'date': current_time, 'net_worth': net_worth})
+        self.equity_curve.append({'date': current_time, 'net_worth': net_worth, 'benchmark': benchmark_price})
 
     def get_equity_curve(self):
-        df = pd.DataFrame(self.equity_curve)
+        df = pd.DataFrame(self.equity_curve, columns=['date', 'net_worth', 'benchmark'])
         df.set_index('date', inplace=True)
         return df

@@ -2,8 +2,7 @@ from abc import ABC, abstractmethod
 import pandas as pd
 from typing import Dict
 
-from contracts.asset import Asset, CashAsset
-from core.market_data import MarketData
+from contracts.asset import Asset
 
 
 class StrategyBase(ABC):
@@ -33,10 +32,11 @@ class StrategyBase(ABC):
     @abstractmethod
     def generate_signals(
         self,
-        market_data: pd.DataFrame | Dict[str, pd.DataFrame],
+        price_data: pd.DataFrame | Dict[str, pd.DataFrame],
         current_date: pd.Timestamp,
         positions: Dict[str, Asset],
-        cash: CashAsset
+        cash: float,
+        **kwargs
     ) -> Dict[str, int]:
         """
         For each asset (ticker), return the Number of shares to buy or sell.
@@ -46,7 +46,11 @@ class StrategyBase(ABC):
         - <0 : Short (number of shares to sell)
         - 0 : No action (hold)
         Strategy must not look ahead beyond `current_date`.
+        :param price_data:
+        :param current_date:
+        :param positions:
         :param cash:
+        :return: Dictionary of number of shares to buy/sell for each asset
         """
         pass
 

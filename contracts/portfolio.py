@@ -3,6 +3,7 @@ import yfinance as yf
 from typing import Dict, List, Optional
 
 from contracts.asset import Asset, CashAsset
+from contracts.order import Order
 from contracts.utils import clean_ticker
 from strategies.stock.base import StrategyBase, StrategyFactory
 
@@ -35,7 +36,7 @@ class Portfolio:
             metadata (Dict, optional): Additional metadata.
         """
         # Initialize Portfolio name
-        assert (isinstance(name, str) and not name.strip()), "Portfolio name must be a non-empty string"
+        assert (isinstance(name, str) and name.strip()), "Portfolio name must be a non-empty string"
         self.name = name
 
         # Initialize tickers
@@ -66,22 +67,23 @@ class Portfolio:
         self.recomposition_freq = recomposition_freq
         self.metadata = metadata or {}
 
-    def execute_trade(self, date: pd.Timestamp, ticker: str,
-                      action: str, shares: int, price: float,
+    def execute_trade(self, date: pd.Timestamp, order: Order, price: float,
                       note: str = 'Strategy Signal'):
         """
         Execute a trade and update portfolio positions and cash.
 
         Args:
             date (pd.Timestamp): Trade date.
-            ticker (str): Asset ticker.
-            action (str): 'BUY' or 'SELL'.
-            shares (int): Number of shares.
             price (float): Trade price per share.
+            order (Order): Order object containing trade details.
             note (str): Optional trade note.
         Raises:
             ValueError: If insufficient cash or shares.
         """
+        ticker = order.ticker
+        action = order.side.name
+        shares = order.quantity
+
         trade_value = shares * price
 
         if action == 'BUY':
@@ -102,9 +104,6 @@ class Portfolio:
 
         self.add_trade(date, ticker, action, shares, price, self._cash.shares, note)
 
-    def get_cash(self) -> float:
-        return self.positions['CASH'].shares
-
     def add_trade(self, date, ticker, action, shares, price, cash_remaining, note=''):
         entry = {
             'date': date,
@@ -121,13 +120,15 @@ class Portfolio:
             entry['revenue'] = shares * price
         self.trade_log.append(entry)
 
-    def update_position(self, ticker, shares_delta):
-        if ticker not in self.positions:
-            self.positions[ticker] = Asset(ticker)
+    # region Get Methods
+
+    def update_position(self, ticker, shares_delta: int):
+        if ticker not in self._positions:
+            raise ValueError(f"Unknown ticker {ticker}")
         if shares_delta > 0:
-            self.positions[ticker].buy(shares_delta)
+            self._positions[ticker].buy(shares_delta)
         elif shares_delta < 0:
-            self.positions[ticker].sell(abs(shares_delta))
+            self._positions[ticker].sell(abs(shares_delta))
 
     def get_trade_log(self) -> pd.DataFrame:
         df = pd.DataFrame(self.trade_log)
@@ -140,11 +141,11 @@ class Portfolio:
         return df
 
     def get_position(self, ticker) -> int:
-        if ticker not in self.positions:
+        if ticker not in self._positions:
             return 0
-        return self.positions[ticker].shares
+        return self._positions[ticker].shares
 
-    def get_portfolio_value(self, prices: Dict[str, float]) -> float:
+    def net_worth(self, prices: Dict[str, float]) -> float:
         """
         Compute total portfolio value given current prices.
         Args:
@@ -152,10 +153,11 @@ class Portfolio:
         Returns:
             float: Total portfolio value.
         """
-        value = self.get_cash()
+        value = self.cash
         for ticker in self.tickers:
-            value += self.positions[ticker].shares * prices.get(ticker, 0.0)
+            value += self._positions[ticker].shares * prices[ticker]
         return value
+    # endregion Get Methods
 
     # region Properties
 
@@ -166,7 +168,7 @@ class Portfolio:
         Returns:
             float: Current cash shares.
         """
-        return self.positions['CASH'].shares
+        return self._cash.shares
 
     @property
     def positions(self) -> dict:
@@ -175,6 +177,6 @@ class Portfolio:
         Returns:
             dict: Dictionary of asset ticker to Asset object.
         """
-        return self.positions
+        return self._positions
 
     # endregion Properties
