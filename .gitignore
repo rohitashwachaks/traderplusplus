@@ -177,7 +177,7 @@ cython_debug/
 /data_cache
 /figures
 /logs
-product_roadmap.md
+_product_roadmap.md
 /run
 /logs
 /.run

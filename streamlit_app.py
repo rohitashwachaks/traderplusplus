@@ -5,7 +5,7 @@
 # from core.backtester import Backtester
 # from core.data_loader import DataIngestionManager
 # from core.market_data import MarketData
-# from core.guardrails.base import Guardrail
+# from core.guardrails.base import GuardrailBase
 # from core.guardrails.trailing_stop_loss import TrailingStopLossGuardrail
 # from core.visualizer import plot_equity_curve, plot_drawdown, plotly_interactive_equity
 # from strategies.stock.base import StrategyFactory
@@ -44,7 +44,7 @@
 #     ingestion = DataIngestionManager(use_cache=True, force_refresh=False, source=data_source)
 #     market_data = MarketData.get_market_data(tickers, str(start_date), str(end_date), ingestion, )
 #     strategy = StrategyFactory.create_strategy(strategy_type, short_window=short_window, long_window=long_window)
-#     guardrails: List[Guardrail] = []
+#     guardrails: List[GuardrailBase] = []
 #     if use_guardrail:
 #         guardrails.append(TrailingStopLossGuardrail(stop_pct=stop_pct))
 #     from contracts.portfolio import Portfolio

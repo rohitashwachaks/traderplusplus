@@ -2,6 +2,20 @@
   <img src="./assets/trader_pp_logo.png" alt="Trader++ Logo" width="100%" style="object-fit:cover;height:300px;object-position:center;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.10);" />
 </p>
 
+> 💡 Why Trader++?
+>
+> I built Trader++ because I wanted a tool that didn’t lie to me.
+>
+> I needed something that could:
+> - Let me write strategies quickly
+> - Simulate realistically
+> - Go from backtest → paper → live with zero rewrites
+> - Show me how my portfolio’s actually doing, holistically!
+>
+> Existing tools? Clunky. Proprietary. Not programmable enough.
+>
+> So I built it — for myself first. Now, it’s for every quant who thinks like a developer.
+>
 > **Unleash the power of modular, realistic, and extensible portfolio simulation.**
 
 ---
@@ -68,6 +82,29 @@ Trader++ isn’t just another backtesting tool. It’s a full-fledged quant trad
 - Unit tests for each module
 - Example strategies (momentum, mean-reversion, breakout)
 - Jupyter/Streamlit demo notebooks
+
+---
+
+## 🚦 MVP Status (June 2025)
+
+| Feature                           | Status      | Notes                                                                                                          |
+|-----------------------------------|-------------|----------------------------------------------------------------------------------------------------------------|
+| Unified Execution Engine          | ✅ Complete | Backtest, Paper, Live modes implemented with shared API. Paper & Live mode requires broker API implementation. |
+| Modular Strategy Framework        | ✅ Complete | StrategyBase and example strategies present. Plug-and-play.                                                    |
+| Portfolio/Risk Management         | ✅ Complete | Portfolio class, guardrails, position sizing hooks implemented.                                                |
+| Analytics & Attribution           | ✅ Partial  | Core metrics (Sharpe, alpha, etc.) present. Some advanced analytics in progress.                               |
+| Interactive Dashboard             | ⚠️ Partial | Streamlit app exists, some features stubbed or in progress.                                                    |
+| Scalable Simulation Engine        | ⚠️ Partial | Event-driven core present; multiprocessing support basic or planned.                                           |
+| Data Layer                        | ✅ Complete | Data ingestion, caching, and basic adapters present.                                                           |
+| ML/DSL Integration                | 🚧 Planned  | ML model integration and YAML/DSL loader planned.                                                              |
+
+---
+
+## Next Steps (Post-MVP)
+- Expand broker integrations for live trading
+- Enhance dashboard with more analytics and controls
+- Add ML/DSL strategy support
+- Improve test coverage and documentation
 
 ---
 
@@ -160,7 +197,7 @@ flowchart TD
 - 📈 **Backtesting Engine** — Realistic execution, guardrails, cash shares checks
 - 🧠 **Pluggable Strategy Interface** — Stateful/stateless signal generation
 - 💼 **Portfolio Tracking** — Accurate PnL with trade logs, equity curves
-- 🛡️ **Guardrail System** — Risk management hooks (stop-loss, asset unregister)
+- 🛡️ **GuardrailBase System** — Risk management hooks (stop-loss, asset unregister)
 - 📊 **Performance Reporting** — Sharpe, max drawdown, win rate, CAGR, more
 - 🔬 **Benchmark Comparison** — Alpha, beta, vs SPY or other tickers
 - 🧪 **Test Strategies** — Debug pipeline (e.g., “buy once on day 1”)
@@ -175,17 +212,20 @@ flowchart TD
    ```
 2. **Run a Backtest**
    ```bash
-   python run_backtest.py --strategy strategies/stock/momentum.py --portfolio configs/sample_portfolio.yaml
+   python main.py --start=2022-05-29 --end=2025-05-29 --cash 50000 --plot --export --tickers=META --refresh --strategy=momentum --benchmark=META --guardrail=trailing_stop_loss
    ```
 3. **Add a New Strategy**
    - Implement a new class in `strategies/` inheriting from `StrategyBase` and implementing `generate_signals()`.
-   - Register your strategy in your backtest config or CLI.
+   - Register your strategy by importing it in `strategies/__init__.py`.
 
+4  **Add a New Guardrail**
+   - Implement a new class in `guardrails/` inheriting from `GuardrailBase` and implementing `evaluate()`.
+   - Register your guardrail by importing it in `guardrails/__init__.py`.
 ---
 
 ## 🤝 Contributing
 
-- See the Development Roadmap above for high-priority areas.
+[//]: # (- See the Development Roadmap above for high-priority areas.)
 - Add new strategies, data adapters, or analytics modules as composable units.
 - Follow modular design and document your code.
 - PRs and issues welcome!

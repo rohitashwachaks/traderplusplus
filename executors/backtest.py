@@ -1,7 +1,7 @@
 from .base import BaseExecutor
 from contracts.order import Order, OrderResult, OrderStatus, OrderType
 from contracts.portfolio import Portfolio
-from core.guardrails.base import Guardrail
+from core.guardrails.base import GuardrailBase
 from core.market_data import MarketData
 from datetime import datetime
 import pandas as pd
@@ -65,7 +65,7 @@ class BacktestExecutor(BaseExecutor):
                                                                              {order.ticker: price}):
                     self.order_status[order_id] = OrderStatus.REJECTED
                     self.fills[order_id] = OrderResult(order_id=order_id, status=OrderStatus.REJECTED,
-                                                       message='Guardrail blocked order')
+                                                       message='GuardrailBase blocked order')
                     continue
             try:
                 self.portfolio.execute_trade(current_time, order, avg_fill_price, note='Backtest Fill')

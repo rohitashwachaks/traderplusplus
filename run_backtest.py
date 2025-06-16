@@ -1,5 +1,7 @@
 import argparse
 import os
+from typing import Optional
+
 from analytics.performance_evaluator import PerformanceEvaluator
 from core.backtester import Backtester
 from core.executors.backtest import BacktestExecutor
@@ -17,6 +19,8 @@ def parse_args():
     parser.add_argument("--start", type=str, default="2023-01-01", help="Start date (YYYY-MM-DD)")
     parser.add_argument("--end", type=str, default="2023-12-31", help="End date (YYYY-MM-DD)")
     parser.add_argument("--cash", type=float, default=100000.0, help="Starting cash (default: 100000)")
+    parser.add_argument("--benchmark", type=str, default="SPY", help="Benchmark ticker for performance comparison (default: SPY)")
+    parser.add_argument("--guardrail", type=Optional[str], default=None, help="Guardrail strategy (e.g. trailing_stop_loss)")
     parser.add_argument("--source", type=str, default="yahoo", help="Data source: yahoo | polygon")
     parser.add_argument("--refresh", action="store_true", help="Force data refresh (ignore cache)")
     parser.add_argument("--export", action="store_true", help="Export trade log and equity curve to CSV")
@@ -26,7 +30,6 @@ def parse_args():
     parser.add_argument("--slippage", type=float, default=0.001, help="Slippage for paper trading (e.g. 0.001 = 0.1%)")
     parser.add_argument("--broker", type=str, default=None,
                         help="Broker API module path for live trading (e.g. brokers.alpaca.AlpacaBrokerAPI)")
-    parser.add_argument("--benchmark", type=str, default="SPY", help="Benchmark ticker for performance comparison (default: SPY)")
     return parser.parse_args()
 
 
@@ -40,6 +43,7 @@ def main():
         benchmark=args.benchmark,
         starting_cash=args.cash,
         strategy=args.strategy,
+        guardrail=args.guardrail,
         metadata={"source": f"{args.mode.capitalize()}Executor"}
     )
     tickers = portfolio.tickers
