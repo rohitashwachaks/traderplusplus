@@ -240,13 +240,13 @@ See the MVP Roadmap above for our ambitious next steps!
 
 ## 📄 License
 
-Distributed under the MIT License.
+Distributed under the Apache-2.0 License.
 
 ---
 
 ## 📬 Contact
 
-Open an issue or reach out via GitHub for questions and collaboration!
+Open an issue or reach out at [rohitashwachaks@gmail.com] for questions and collaboration!
 
 ---
 
