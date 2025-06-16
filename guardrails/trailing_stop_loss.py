@@ -1,10 +1,11 @@
 from typing import Dict
 
 from contracts.asset import Asset
-from core.guardrails.base import Guardrail
+from core.guardrails.base import GuardrailBase, GuardrailFactory
 
 
-class TrailingStopLossGuardrail(Guardrail):
+@GuardrailFactory.register("trailing_stop_loss")
+class TrailingStopLossGuardrail(GuardrailBase):
     def __init__(self, stop_pct: float = 0.05):
         self.stop_pct = stop_pct
         self.entry_prices = {}
@@ -31,7 +32,7 @@ class TrailingStopLossGuardrail(Guardrail):
             if current_price > peak:
                 self.highest_since_entry[ticker] = current_price
             elif current_price < peak * (1 - self.stop_pct):
-                print(f"🔻 Guardrail: {ticker} triggered trailing stop at {current_price:.2f} (peak: {peak:.2f})")
+                print(f"🔻 GuardrailBase: {ticker} triggered trailing stop at {current_price:.2f} (peak: {peak:.2f})")
                 exits[ticker] = True
 
         return exits

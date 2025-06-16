@@ -32,7 +32,6 @@ def _finalize_plot(title: str):
 
 def plot_equity_curve(equity_curve: pd.Series, title: str = "Equity Curve"):
     _validate_equity_series(equity_curve)
-
     plt.figure(figsize=(10, 4))
     plt.plot(equity_curve, label='Equity', linewidth=2)
     plt.title(title)
@@ -106,6 +105,63 @@ def plot_equity_with_trades(equity_curve: pd.Series,
     return _finalize_plot(title)
 
 
+def plot_equity_vs_networth(equity_curve: pd.Series,
+                            networth_curve: pd.Series,
+                            title: str = "Strategy vs Net Worth"):
+    _validate_equity_series(equity_curve)
+    _validate_equity_series(networth_curve)
+
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(12, 5))
+    plt.plot(equity_curve, label='Strategy Equity', linewidth=2)
+    plt.plot(networth_curve, label='Actual Net Worth', linestyle='--', linewidth=2)
+    plt.title(title)
+    plt.xlabel("Date")
+    plt.ylabel("Value ($)")
+    plt.grid(True)
+    plt.legend()
+    return _finalize_plot(title)
+
+
+def plot_equity_vs_benchmark(
+        portfolio_curve: pd.Series,
+        benchmark_curve: pd.Series,
+        title: str = "Strategy vs Benchmark Equity Curve",
+        normalize: bool = False
+):
+    """
+    Plot portfolio equity and benchmark on the same chart for visual comparison.
+    If normalize=True, both curves start at 1 for relative performance.
+    If normalize=False, both curves start at the same value in dollar terms for fair comparison.
+    """
+    _validate_equity_series(portfolio_curve)
+    _validate_equity_series(benchmark_curve)
+    import matplotlib.pyplot as plt
+    # Align indices
+    # common_idx = portfolio_curve.index.intersection(benchmark_curve.index)
+    # portfolio_curve = portfolio_curve.loc[common_idx]
+    # benchmark_curve = benchmark_curve.loc[common_idx]
+    if normalize:
+        portfolio_curve /= portfolio_curve.iloc[0]
+        benchmark_curve /= benchmark_curve.iloc[0]
+    else:
+        # Scale benchmark to start at same value as portfolio
+        if benchmark_curve.iloc[0] != 0:
+            n = portfolio_curve.iloc[0] / benchmark_curve.iloc[0]
+            benchmark_curve *= n
+    plt.figure(figsize=(12, 5))
+    plt.plot(portfolio_curve, label='Strategy', linewidth=2)
+    plt.plot(benchmark_curve, label='Benchmark', linestyle='--', linewidth=2)
+    plt.title(title)
+    plt.xlabel("Date")
+    plt.ylabel("Normalized Value" if normalize else "Value ($)")
+    plt.grid(True)
+    plt.legend()
+    plt.gca().xaxis.set_major_formatter(DateFormatter('%Y-%m'))
+    return _finalize_plot(title)
+
+
 def plotly_interactive_equity(equity_curve: pd.Series,
                               trades: pd.DataFrame = None,
                               title: str = "Interactive Equity Curve"):
@@ -124,8 +180,8 @@ def plotly_interactive_equity(equity_curve: pd.Series,
         for action in ['BUY', 'SELL']:
             filtered = trades[trades['action'] == action]
             fig.add_trace(go.Scatter(
-                x=pd.to_datetime(filtered['date']),
-                y=[equity_curve.get(pd.to_datetime(d), None) for d in filtered['date']],
+                x=pd.to_datetime(filtered.index),
+                y=equity_curve.loc[filtered.index],
                 mode='markers',
                 marker=dict(
                     color='green' if action == 'BUY' else 'red',
@@ -136,24 +192,75 @@ def plotly_interactive_equity(equity_curve: pd.Series,
             ))
 
     fig.update_layout(title=title, xaxis_title="Date", yaxis_title="Net Worth")
-    fig.show()
+
+    # Save the figure to an HTML file instead of showing it directly
+    # This avoids potential semaphore leaks from fig.show()
+    os.makedirs("./figures", exist_ok=True)
+    safe_title = title.lower().replace(" ", "_")
+    html_path = f"./figures/{safe_title}.html"
+    fig.write_html(html_path)
+    print(f"Interactive plot saved to {html_path}")
+
     return fig
 
 
-def plot_equity_vs_networth(equity_curve: pd.Series,
-                            networth_curve: pd.Series,
-                            title: str = "Strategy vs Net Worth"):
-    _validate_equity_series(equity_curve)
-    _validate_equity_series(networth_curve)
+def plotly_equity_vs_benchmark(
+        portfolio_curve: pd.Series,
+        benchmark_curve: pd.Series,
+        title: str = "Strategy vs Benchmark Equity Curve",
+        normalize: bool = False,
+        **kwargs
+):
+    """
+    Plotly interactive chart for portfolio vs benchmark.
+    If normalize=True, both curves start at 1 for relative performance.
+    If normalize=False, both curves start at the same value in dollar terms for fair comparison.
+    """
+    # Align indices
+    # common_idx = portfolio_curve.index.intersection(benchmark_curve.index)
+    # portfolio_curve = portfolio_curve.loc[common_idx]
+    # benchmark_curve = benchmark_curve.loc[common_idx]
+    if normalize:
+        portfolio_curve /= portfolio_curve.iloc[0]
+        benchmark_curve /= benchmark_curve.iloc[0]
+    else:
+        # Scale benchmark to start at same value as portfolio
+        if benchmark_curve.iloc[0] != 0:
+            n = portfolio_curve.iloc[0] / benchmark_curve.iloc[0]
+            benchmark_curve *= n
 
-    import matplotlib.pyplot as plt
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=portfolio_curve.index, y=portfolio_curve, mode='lines', name='Strategy'))
+    fig.add_trace(go.Scatter(x=benchmark_curve.index, y=benchmark_curve, mode='lines', name='Benchmark'))
 
-    plt.figure(figsize=(12, 5))
-    plt.plot(equity_curve, label='Strategy Equity', linewidth=2)
-    plt.plot(networth_curve, label='Actual Net Worth', linestyle='--', linewidth=2)
-    plt.title(title)
-    plt.xlabel("Date")
-    plt.ylabel("Value ($)")
-    plt.grid(True)
-    plt.legend()
-    return _finalize_plot(title)
+    if "trade_logs" in kwargs:
+        trade_logs = kwargs["trade_logs"]
+        if trade_logs is not None:
+            for action in ['BUY', 'SELL']:
+                filtered = trade_logs[trade_logs['action'] == action]
+                if not filtered.empty:
+                    fig.add_trace(go.Scatter(
+                        x=pd.to_datetime(filtered.index),
+                        y=portfolio_curve.loc[filtered.index],
+                        mode='markers',
+                        marker=dict(
+                            color='green' if action == 'BUY' else 'red',
+                            symbol='triangle-up' if action == 'BUY' else 'triangle-down',
+                            size=10
+                        ),
+                        name=action
+                    ))
+            title += " (with Trades)"
+
+    fig.update_layout(title=title, xaxis_title='Date', yaxis_title='Normalized Value' if normalize else 'Value ($)',
+                      template='plotly_white')
+
+    # Save the figure to an HTML file instead of showing it directly
+    # This avoids potential semaphore leaks from fig.show()
+    os.makedirs("./figures", exist_ok=True)
+    safe_title = title.lower().replace(" ", "_")
+    html_path = f"./figures/{safe_title}.html"
+    fig.write_html(html_path)
+    print(f"Interactive plot saved to {html_path}")
+
+    return fig

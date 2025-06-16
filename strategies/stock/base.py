@@ -1,33 +1,56 @@
 from abc import ABC, abstractmethod
 import pandas as pd
-from typing import Dict
+from typing import Dict, Optional
 
-from core.market_data import MarketData
+from contracts.asset import Asset
 
 
 class StrategyBase(ABC):
+    """
+    Abstract base class for trading strategies.
+    All strategies must implement get_name and generate_signals.
+    """
+
+    def __init__(self):
+        self.lookback_period = None
+
     @abstractmethod
     def get_name(self) -> str:
         """
-        Unique strategy name for identification.
+        Return unique strategy name for identification.
         """
         pass
+
+    @property
+    def lookback(self) -> int:
+        """
+        Return the lookback period in days for the strategy.
+        :return:
+        """
+        return self.lookback_period
 
     @abstractmethod
     def generate_signals(
         self,
-        market_data: MarketData,
+        price_data: pd.DataFrame | Dict[str, pd.DataFrame],
         current_date: pd.Timestamp,
-        lookback_window: int = 60
-    ) -> Dict[str, int]:
+        positions: Dict[str, Asset],
+        cash: float,
+        **kwargs
+    ) -> Optional[Dict[str, int]]:
         """
-        For each asset (ticker), return the current trading signal.
-        Output: { 'AAPL': 1, 'MSFT': -1, 'SPY': 0 }
+        For each asset (ticker), return the Number of shares to buy or sell.
+        Output: { 'AAPL': 1, 'MSFT': -5, 'SPY': 0 }
         Each signal should be:
-        - 1 for Buy
-        - -1 for Sell
-        - 0 for Hold
+        - >0 : Long (number of shares to buy)
+        - <0 : Short (number of shares to sell)
+        - 0 : No action (hold)
         Strategy must not look ahead beyond `current_date`.
+        :param price_data:
+        :param current_date:
+        :param positions:
+        :param cash:
+        :return: Dictionary of number of shares to buy/sell for each asset
         """
         pass
 
@@ -51,6 +74,7 @@ class StrategyFactory:
     @classmethod
     def get_supported_strategies(cls) -> set:
         """
-        Returns a list of all registered strategy names.
+        Return all registered strategy names
+        :return:
         """
         return set(cls._registry.keys())

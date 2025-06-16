@@ -1,15 +1,17 @@
 from abc import ABC
-from typing import Dict
+from typing import Dict, Optional
 
 import pandas as pd
 
+from contracts.asset import Asset, CashAsset
 from core.market_data import MarketData
 from strategies.stock.base import StrategyBase, StrategyFactory
 
 
 @StrategyFactory.register("buy_n_hold")
 class BuyNHoldStrategy(StrategyBase, ABC):
-    def __init__(self):
+    def __init__(self, **kwargs):
+        self.lookback_period = 1
         self.has_bought = set()
 
     def get_name(self) -> str:
@@ -21,17 +23,24 @@ class BuyNHoldStrategy(StrategyBase, ABC):
             "name": self.get_name()
         }
 
-    def generate_signals(
-            self,
-            market_data: MarketData,
-            current_date: pd.Timestamp,
-            lookback_window: int = 60
-    ) -> Dict[str, int]:
-        signals = {}
-        for ticker in market_data.get_available_symbols():
-            if ticker not in self.has_bought:
-                signals[ticker] = 1
-                self.has_bought.add(ticker)
-            else:
-                signals[ticker] = 0
-        return signals
+    def generate_signals(self, price_data: pd.DataFrame | Dict[str, pd.DataFrame], current_date: pd.Timestamp,
+                         positions: Dict[str, Asset], cash: float, **kwargs) -> Optional[Dict[str, int]]:
+        """
+        Buy once and hold till perpetuity for the strategy.
+        :param price_data: A DataFrame or dict of DataFrames containing price data for each asset.
+        :param cash:
+        :param current_date:
+        :param positions:
+        :return:
+        """
+        if len(self.has_bought) > 0:
+            # If already bought, no further action
+            return {}
+
+        ticker = list(positions.keys())[0]  # Single ticker strategy
+
+        # Allocate all cash to the first asset
+        order_qty = cash // price_data[ticker]['Close'].loc[current_date]
+        if order_qty > 0:
+            return {ticker: int(order_qty)}
+        self.has_bought.add(ticker)

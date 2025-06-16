@@ -1,2 +1,14 @@
 yfinance
 pandas
+matplotlib
+plotly
+numpy
+requests
+dotenv
+python-dotenv
+dataclasses
+dataclasses-json
+streamlit
+pyfolio
+backtrader
+prefect

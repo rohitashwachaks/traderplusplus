@@ -13,11 +13,14 @@ def _fetch_data(ticker: str, start_date: str, end_date: str, source: str) -> pd.
     if source == "yahoo":
         from data_ingestion.yahoo_fetcher import fetch_yahoo_data
         return fetch_yahoo_data(ticker, start_date, end_date)
+    elif source == "alpaca":
+        from data_ingestion.alpaca_fetcher import fetch_alpaca_data
+        return fetch_alpaca_data(ticker, start_date, end_date)
     elif source == "polygon":
         from data_ingestion.polygon_fetcher import fetch_polygon_data
         return fetch_polygon_data(ticker, start_date, end_date)
     else:
-        raise ValueError(f"Unsupported data source: {source}")
+        raise ValueError(f"Unsupported data source: {source}. Supported sources are 'yahoo', 'alpaca', and 'polygon'.")
 
 
 def load_price_data(ticker: str, start_date: str, end_date: str,
@@ -25,7 +28,18 @@ def load_price_data(ticker: str, start_date: str, end_date: str,
                     force_refresh: bool = False,
                     source: str = "yahoo") -> pd.DataFrame:
     """
-    Load historical OHLCV data for a single ticker.
+    Load historical OHLCV data for a single ticker from the specified data source.
+
+    Args:
+        ticker (str): The ticker ticker of the security.
+        start_date (str): The start date of the data range.
+        end_date (str): The end date of the data range.
+        use_cache (bool, optional): Whether to use cached data. Defaults to True.
+        force_refresh (bool, optional): Whether to force a refresh of the data. Defaults to False.
+        source (str, optional): The data source to use. Defaults to "yahoo".
+
+    Returns:
+        pd.DataFrame: A pandas DataFrame containing the historical OHLCV data.
     """
     os.makedirs("./data_cache", exist_ok=True)
     cache_key = _make_cache_key(ticker, start_date, end_date, source)
@@ -55,20 +69,35 @@ class DataIngestionManager:
         self.force_refresh = force_refresh
         self.source = source
 
-    def get_data(self, tickers: List[str], start_date: str, end_date: str) -> Dict[str, pd.DataFrame]:
+    def get_data(self, tickers: List[str], start_date: str, end_date: str) -> Dict[str, pd.DataFrame] | pd.DataFrame:
         """
         Return a dictionary of {ticker: DataFrame} for all requested tickers.
+
+        Args:
+            tickers (List[str]): A list of ticker symbols.
+            start_date (str): The start date of the data range.
+            end_date (str): The end date of the data range.
+
+        Returns:
+            Dict[str, pd.DataFrame]: A dictionary containing the historical OHLCV data for each ticker.
         """
-        result = {}
+        # TODO: Convert Dict structure to a single Multi-indexed dataframe?
+        # data = load_price_data(
+        #         tickers,
+        #         start_date,
+        #         end_date,
+        #         use_cache=self.use_cache,
+        #         force_refresh=self.force_refresh,
+        #         source=self.source
+        #     )
+        data = {}
         for ticker in tickers:
-            df = load_price_data(
-                ticker=ticker,
-                start_date=start_date,
-                end_date=end_date,
+            data[ticker] = load_price_data(
+                ticker,
+                start_date,
+                end_date,
                 use_cache=self.use_cache,
                 force_refresh=self.force_refresh,
                 source=self.source
             )
-            result[ticker] = df
-        return result
-
+        return data
