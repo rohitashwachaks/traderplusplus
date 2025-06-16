@@ -1,19 +1,13 @@
 import argparse
 import os
-import pandas as pd
+from analytics.performance_evaluator import PerformanceEvaluator
 from core.backtester import Backtester
+from core.executors.backtest import BacktestExecutor
 from core.data_loader import DataIngestionManager
 from core.guardrails.trailing_stop_loss import TrailingStopLossGuardrail
 from core.market_data import MarketData
-from core.visualizer import plot_equity_curve, plot_per_asset_equity, plot_equity_with_trades, \
-    plotly_interactive_equity, plot_drawdown, plotly_equity_vs_benchmark
-from strategies.stock.base import StrategyFactory
-from utils.metrics import summarize_metrics
 from contracts.portfolio import Portfolio
-from core.executors.backtest import BacktestExecutor
-
-from analytics.performance_evaluator import PerformanceEvaluator
-import yfinance as yf
+from core.visualizer import plot_drawdown, plotly_equity_vs_benchmark
 
 
 def parse_args():
@@ -49,7 +43,6 @@ def main():
         metadata={"source": f"{args.mode.capitalize()}Executor"}
     )
     tickers = portfolio.tickers
-    benchmark = portfolio.benchmark
     strategy = portfolio.strategy
 
     # --- Market Data Setup ---
@@ -80,22 +73,12 @@ def main():
     if args.plot:
         net_worth_series = equity_curve['net_worth']
         benchmark_series = equity_curve['benchmark']
-        plot_equity_curve(net_worth_series, benchmark_series)
         plot_drawdown(net_worth_series)
-        # plotly_interactive_equity(net_worth_series, trade_log)
-        plotly_equity_vs_benchmark(net_worth_series, benchmark_series)
-    # summarize_metrics(equity_curve=equity_curve, trades_df=trade_log, name=portfolio.name)
+        plotly_equity_vs_benchmark(net_worth_series, benchmark_series, trade_logs=trade_log)
 
     # --- Performance Evaluation ---
-    # Attempt to get a benchmark series (use first ticker if ^SPY not present)
     try:
-        # bench_ticker = portfolio.benchmark if hasattr(portfolio, 'benchmark') else args.benchmark
-        # bench_df = yf.download(bench_ticker, start=args.start, end=args.end)
-        benchmark_curve = equity_curve.get_equity_curve()
-        benchmark_curve.index = pd.to_datetime(benchmark_curve.index)
-        benchmark_curve = benchmark_curve.reindex(equity_curve.index, method='ffill')
-        evaluator = PerformanceEvaluator(equity_curve['net_worth'], benchmark_curve)
-        perf_metrics = evaluator.compute_metrics()
+        evaluator = PerformanceEvaluator(equity_curve['net_worth'], equity_curve['benchmark'])
         print("\n=== Strategy vs. Benchmark ===")
         print(evaluator.summary())
     except Exception as e:

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import pandas as pd
-from typing import Dict
+from typing import Dict, Optional
 
 from contracts.asset import Asset
 
@@ -37,7 +37,7 @@ class StrategyBase(ABC):
         positions: Dict[str, Asset],
         cash: float,
         **kwargs
-    ) -> Dict[str, int]:
+    ) -> Optional[Dict[str, int]]:
         """
         For each asset (ticker), return the Number of shares to buy or sell.
         Output: { 'AAPL': 1, 'MSFT': -5, 'SPY': 0 }

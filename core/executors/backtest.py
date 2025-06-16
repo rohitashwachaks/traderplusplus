@@ -88,4 +88,5 @@ class BacktestExecutor(BaseExecutor):
     def get_equity_curve(self):
         df = pd.DataFrame(self.equity_curve, columns=['date', 'net_worth', 'benchmark'])
         df.set_index('date', inplace=True)
+        df.fillna(method='ffill', inplace=True)
         return df

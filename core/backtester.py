@@ -79,7 +79,7 @@ class Backtester:
                             order = Order(
                                 ticker=symbol,
                                 side=order_side,
-                                quantity=order_size,
+                                quantity=abs(order_size),  # Use absolute value for quantity
                                 order_type=OrderType.MARKET
                             )
                             self.executor.submit_order(order)

@@ -24,16 +24,16 @@ class PerformanceEvaluator:
             benchmark_curve (pd.Series): Benchmark value/indexed by date.
             risk_free_rate (float): Annualized risk-free rate (as decimal).
         """
-        self.portfolio_curve = portfolio_curve.sort_index()
-        self.benchmark_curve = benchmark_curve.sort_index()
+        self.portfolio_curve = portfolio_curve#.sort_index()
+        self.benchmark_curve = benchmark_curve#.sort_index()
         self.risk_free_rate = risk_free_rate
-        self._align_curves()
+        # self._align_curves()
 
-    def _align_curves(self):
-        # Align curves to common dates
-        common_idx = self.portfolio_curve.index.intersection(self.benchmark_curve.index)
-        self.portfolio_curve = self.portfolio_curve.loc[common_idx]
-        self.benchmark_curve = self.benchmark_curve.loc[common_idx]
+    # def _align_curves(self):
+    #     # Align curves to common dates
+    #     common_idx = self.portfolio_curve.index.intersection(self.benchmark_curve.index)
+    #     self.portfolio_curve = self.portfolio_curve.loc[common_idx]
+    #     self.benchmark_curve = self.benchmark_curve.loc[common_idx]
 
     def compute_metrics(self) -> Dict[str, float]:
         """
@@ -75,8 +75,8 @@ class PerformanceEvaluator:
 
         # Alpha/Beta via linear regression
         try:
-            X = np.vstack([excess_bench.values, np.ones(len(excess_bench))]).T
-            beta, alpha = np.linalg.lstsq(X, excess_ret.values, rcond=None)[0]
+            X = np.vstack([np.ones(len(excess_bench)), excess_bench.values]).T
+            alpha, beta = np.linalg.lstsq(X, excess_ret.values, rcond=None)[0]
             metrics['alpha'] = alpha * 252  # annualized
             metrics['beta'] = beta
         except Exception as e:

@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Dict
+from typing import Dict, Optional
 
 import pandas as pd
 
@@ -24,12 +24,11 @@ class BuyNHoldStrategy(StrategyBase, ABC):
         }
 
     def generate_signals(self, price_data: pd.DataFrame | Dict[str, pd.DataFrame], current_date: pd.Timestamp,
-                         positions: Dict[str, Asset], cash: float, **kwargs) -> Dict[str, int]:
+                         positions: Dict[str, Asset], cash: float, **kwargs) -> Optional[Dict[str, int]]:
         """
         Buy once and hold till perpetuity for the strategy.
         :param price_data: A DataFrame or dict of DataFrames containing price data for each asset.
         :param cash:
-        :param **kwargs:
         :param current_date:
         :param positions:
         :return:

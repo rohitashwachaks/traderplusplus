@@ -83,25 +83,18 @@ class Portfolio:
         ticker = order.ticker
         action = order.side.name
         shares = order.quantity
-
         trade_value = shares * price
-
         if action == 'BUY':
             if self.cash < trade_value:
                 raise ValueError(f"Insufficient cash to buy {shares} shares of {ticker}")
-            self._cash.withdraw_cash(trade_value)
-            self.update_position(ticker, shares)
-
         elif action == 'SELL':
             held = self.get_position(ticker)
             if held < shares:
                 raise ValueError(f"Trying to sell more shares than held for {ticker}")
-            self.update_position(ticker, -shares)
-            self._cash.deposit_cash(trade_value)
-
         else:
             raise ValueError("Action must be either 'BUY' or 'SELL'")
 
+        self.update_position(ticker, shares, action, trade_value)
         self.add_trade(date, ticker, action, shares, price, self._cash.shares, note)
 
     def add_trade(self, date, ticker, action, shares, price, cash_remaining, note=''):
@@ -122,13 +115,15 @@ class Portfolio:
 
     # region Get Methods
 
-    def update_position(self, ticker, shares_delta: int):
+    def update_position(self, ticker, shares_delta: int, action: str, trade_value: float):
         if ticker not in self._positions:
             raise ValueError(f"Unknown ticker {ticker}")
-        if shares_delta > 0:
+        if action == 'BUY':
+            self._cash.withdraw_cash(trade_value)
             self._positions[ticker].buy(shares_delta)
-        elif shares_delta < 0:
-            self._positions[ticker].sell(abs(shares_delta))
+        elif action == 'SELL':
+            self._positions[ticker].sell(shares_delta)
+            self._cash.deposit_cash(trade_value)
 
     def get_trade_log(self) -> pd.DataFrame:
         df = pd.DataFrame(self.trade_log)
