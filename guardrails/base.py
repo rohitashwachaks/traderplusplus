@@ -13,6 +13,23 @@ class GuardrailBase(ABC):
         """
         pass
 
+    def register_entry(self, ticker, avg_fill_price):
+        """
+        Register a new position entry
+        :param ticker:
+        :param avg_fill_price:
+        :return:
+        """
+        pass
+
+    def unregister(self, ticker):
+        """
+        Unregister a position (called on full exit)
+        :param ticker:
+        :return:
+        """
+        pass
+
 
 class GuardrailFactory:
     _registry = {}

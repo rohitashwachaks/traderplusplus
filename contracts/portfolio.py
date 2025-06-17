@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 from contracts.asset import Asset, CashAsset
 from contracts.order import Order
 from contracts.utils import clean_ticker
-from core.guardrails.base import GuardrailFactory
+from guardrails.base import GuardrailFactory
 from strategies.stock.base import StrategyBase, StrategyFactory
 
 
@@ -20,7 +20,6 @@ class Portfolio:
                  starting_cash: float,
                  strategy: str,
                  benchmark: str = "SPY",
-                 guardrail: Optional[str] = None,
                  rebalance_freq: Optional[str] = None,
                  recomposition_freq: Optional[str] = None,
                  metadata: Dict = None):
@@ -56,11 +55,6 @@ class Portfolio:
         benchmark = clean_ticker(benchmark)
         assert isinstance(benchmark, str), "Benchmark must be a string"
         self.benchmark = benchmark
-
-        # Initialize guardrail
-        if guardrail:
-            assert guardrail in GuardrailFactory.get_supported_guardrails(), f"Unsupported guardrail: {guardrail}. Supported guardrails: {GuardrailFactory.get_supported_guardrails()}"
-            self.guardrail = GuardrailFactory.create_guardrail(guardrail)
 
         self._positions: Dict[str, Asset | CashAsset] = {
             ticker: Asset(ticker)

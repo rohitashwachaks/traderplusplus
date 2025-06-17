@@ -4,9 +4,9 @@ from typing import Optional
 
 from analytics.performance_evaluator import PerformanceEvaluator
 from core.backtester import Backtester
-from core.executors.backtest import BacktestExecutor
+from executors.backtest import BacktestExecutor
 from core.data_loader import DataIngestionManager
-from core.guardrails.trailing_stop_loss import TrailingStopLossGuardrail
+from guardrails.trailing_stop_loss import TrailingStopLossGuardrail
 from core.market_data import MarketData
 from contracts.portfolio import Portfolio
 from core.visualizer import plot_drawdown, plotly_equity_vs_benchmark
@@ -20,7 +20,7 @@ def parse_args():
     parser.add_argument("--end", type=str, default="2023-12-31", help="End date (YYYY-MM-DD)")
     parser.add_argument("--cash", type=float, default=100000.0, help="Starting cash (default: 100000)")
     parser.add_argument("--benchmark", type=str, default="SPY", help="Benchmark ticker for performance comparison (default: SPY)")
-    parser.add_argument("--guardrail", type=Optional[str], default=None, help="Guardrail strategy (e.g. trailing_stop_loss)")
+    parser.add_argument("--guardrails", type=str, default=None, help="Guardrail strategy (e.g. trailing_stop_loss)")
     parser.add_argument("--source", type=str, default="yahoo", help="Data source: yahoo | polygon")
     parser.add_argument("--refresh", action="store_true", help="Force data refresh (ignore cache)")
     parser.add_argument("--export", action="store_true", help="Export trade log and equity curve to CSV")
@@ -43,7 +43,6 @@ def main():
         benchmark=args.benchmark,
         starting_cash=args.cash,
         strategy=args.strategy,
-        guardrail=args.guardrail,
         metadata={"source": f"{args.mode.capitalize()}Executor"}
     )
     tickers = portfolio.tickers
@@ -54,7 +53,8 @@ def main():
     market_data = MarketData(ingestion, simulation_start_date=args.start)
 
     # --- Executor Setup ---
-    guardrails = None
+
+    guardrails = args.guardrails
     # guardrails = [TrailingStopLossGuardrail()]
     executor = BacktestExecutor(portfolio=portfolio, market_data=market_data, guardrails=guardrails)
 
