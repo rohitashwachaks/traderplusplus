@@ -22,7 +22,8 @@ class Portfolio:
                  benchmark: str = "SPY",
                  rebalance_freq: Optional[str] = None,
                  recomposition_freq: Optional[str] = None,
-                 metadata: Dict = None):
+                 metadata: Dict = None,
+                 guardrails=None):
         """
         Initialize a Portfolio object.
 
@@ -55,6 +56,18 @@ class Portfolio:
         benchmark = clean_ticker(benchmark)
         assert isinstance(benchmark, str), "Benchmark must be a string"
         self.benchmark = benchmark
+
+        # Initialize guardrail
+        self.guardrails = []  # List of guardrails
+        if guardrails:
+            guardrails = {t.strip() for t in guardrails.split(",")}
+            invalid_guardrails = guardrails - GuardrailFactory.get_supported_guardrails()
+            assert len(
+                invalid_guardrails) == 0, f"Unsupported guardrails: {invalid_guardrails}. Supported guardrails: {GuardrailFactory.get_supported_guardrails()}"
+            self.guardrails = [GuardrailFactory.create_guardrail(guardrail) for guardrail in guardrails]
+
+        guardrail_str = ', '.join([g.name for g in self.guardrails]) if self.guardrails else 'None'
+        print(f"Guardrails: {guardrail_str}")
 
         self._positions: Dict[str, Asset | CashAsset] = {
             ticker: Asset(ticker)
@@ -177,3 +190,22 @@ class Portfolio:
         return self._positions
 
     # endregion Properties
+
+    def generate_signals_with_guardrails(self, historical_data, current_date):
+        # Step 1: Generate signals from the strategy
+        signals = self.strategy.generate_signals(
+            historical_data,
+            current_date=current_date,
+            positions=self.positions,
+            cash=self.cash
+        ) or {}
+
+        # Step 2: Run guardrail checks and overwrite signals if necessary
+        if self.guardrails:
+            current_prices = {ticker: historical_data[ticker]['Close'].iloc[-1] for ticker in self.tickers}
+            for guardrail in self.guardrails:
+                exits = guardrail.evaluate(self.positions, current_prices)
+                for ticker, should_exit in exits.items():
+                    if should_exit:
+                        signals[ticker] = -abs(self.positions[ticker].shares) if ticker in self.positions else 0
+        return signals

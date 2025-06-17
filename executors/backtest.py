@@ -15,23 +15,13 @@ class BacktestExecutor(BaseExecutor):
     It does not interact with any live market or broker API.
     Instead, it simulates order execution by filling orders at historical prices.
     """
-    def __init__(self, portfolio: Portfolio, market_data: MarketData, guardrails=None):
+    def __init__(self, portfolio: Portfolio, market_data: MarketData):
         self.portfolio = portfolio
         self.market_data = market_data
         self.orders = {}  # order_id -> Order
         self.order_status = {}  # order_id -> OrderStatus
         self.fills = {}  # order_id -> OrderResult
         self.equity_curve = []
-        self.guardrails = []  # List of guardrails
-
-        # Initialize guardrail
-        if guardrails:
-            guardrails = {t.strip() for t in guardrails.split(",")}
-            invalid_guardrails = guardrails - GuardrailFactory.get_supported_guardrails()
-            assert len(invalid_guardrails) == 0, f"Unsupported guardrails: {invalid_guardrails}. Supported guardrails: {GuardrailFactory.get_supported_guardrails()}"
-            self.guardrails = [GuardrailFactory.create_guardrail(guardrail) for guardrail in guardrails]
-
-        print(self.guardrails)
 
     def submit_order(self, order: Order):
         order_id = order.client_order_id or str(uuid.uuid4())
@@ -68,15 +58,20 @@ class BacktestExecutor(BaseExecutor):
                 continue
             fill_qty = order.quantity
             avg_fill_price = price
-            # Guardrails (if any)
-            for guardrail in self.guardrails:
-                if hasattr(guardrail, 'evaluate') and guardrail.evaluate(self.portfolio.positions,
-                                                                             {order.ticker: price}):
-                    self.order_status[order_id] = OrderStatus.REJECTED
-                    self.fills[order_id] = OrderResult(order_id=order_id, status=OrderStatus.REJECTED,
-                                                       message='GuardrailBase blocked order')
-                    continue
+
             try:
+                # is_rejected: bool = False
+                # # Guardrails (if any)
+                # for guardrail in self.guardrails:
+                #     if guardrail.evaluate(self.portfolio.positions, {order.ticker: price}):
+                #         self.order_status[order_id] = OrderStatus.REJECTED
+                #         self.fills[order_id] = OrderResult(order_id=order_id, status=OrderStatus.REJECTED,
+                #                                            message=f'Guardrail {guardrail.name} blocked order')
+                #         is_rejected = True
+                #         break
+                # if is_rejected:
+                #     continue
+
                 if self.order_status.get(order_id, '') == OrderStatus.REJECTED:
                     continue
 

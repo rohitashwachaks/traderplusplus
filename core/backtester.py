@@ -66,9 +66,9 @@ class Backtester:
                 # current_date = pd.to_datetime(current_date)
                 historical_data = self.market_data.get_history(self.tickers, end_date=current_date, lookback=self.strategy.lookback_period)
 
-                # --- PURE STRATEGY: ONLY GENERATE SIGNALS ---
-                signals = self.strategy.generate_signals(historical_data, current_date=current_date,
-                                                         positions=self.portfolio.positions, cash=self.portfolio.cash)
+                # --- STRATEGY + GUARDRAILS ---
+                signals = self.portfolio.generate_signals_with_guardrails(historical_data, current_date)
+
                 # --- EXECUTOR: SUBMIT ORDERS BASED ON SIGNALS ---
                 if signals:
                     for symbol, order_size in signals.items():

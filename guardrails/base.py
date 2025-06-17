@@ -3,6 +3,10 @@ from typing import Dict
 
 
 class GuardrailBase(ABC):
+    def __init__(self):
+        # Name will be set by the factory decorator
+        self.name = getattr(self, 'name', None)
+
     @abstractmethod
     def evaluate(self, positions: Dict[str, int], prices: Dict[str, float]) -> Dict[str, bool]:
         """
@@ -37,6 +41,7 @@ class GuardrailFactory:
     @classmethod
     def register(cls, name: str):
         def decorator(guardrail_cls):
+            guardrail_cls.name = name  # Set the name attribute on the class
             cls._registry[name] = guardrail_cls
             return guardrail_cls
         return decorator

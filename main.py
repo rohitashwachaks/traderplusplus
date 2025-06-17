@@ -43,7 +43,8 @@ def main():
         benchmark=args.benchmark,
         starting_cash=args.cash,
         strategy=args.strategy,
-        metadata={"source": f"{args.mode.capitalize()}Executor"}
+        metadata={"source": f"{args.mode.capitalize()}Executor"},
+        guardrails=args.guardrails
     )
     tickers = portfolio.tickers
     strategy = portfolio.strategy
@@ -53,10 +54,7 @@ def main():
     market_data = MarketData(ingestion, simulation_start_date=args.start)
 
     # --- Executor Setup ---
-
-    guardrails = args.guardrails
-    # guardrails = [TrailingStopLossGuardrail()]
-    executor = BacktestExecutor(portfolio=portfolio, market_data=market_data, guardrails=guardrails)
+    executor = BacktestExecutor(portfolio=portfolio, market_data=market_data)
 
     # --- Backtester Setup ---
     bt = Backtester(strategy=strategy, market_data=market_data, portfolio=portfolio, executor=executor)

@@ -10,7 +10,7 @@ from strategies.stock.base import StrategyBase, StrategyFactory
 
 @StrategyFactory.register("momentum")
 class MomentumStrategy(StrategyBase, ABC):
-    def __init__(self, short_window: int = 10, long_window: int = 30, lookback_period: int = 60, **kwargs):
+    def __init__(self, short_window: int =5, long_window: int = 20, lookback_period: int = 60, **kwargs):
         self.short_window = short_window
         self.long_window = long_window
         self.lookback_period = lookback_period
