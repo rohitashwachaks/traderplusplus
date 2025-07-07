@@ -1,6 +1,8 @@
 # core/market_data.py
+from datetime import timedelta
+
 import pandas as pd
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from core.data_loader import DataIngestionManager
 
@@ -11,7 +13,7 @@ class MarketData:
     def __init__(self, ingestion_manager: DataIngestionManager, simulation_start_date: str = None):
         self._ingestion_manager = ingestion_manager
         self.data: Dict[str, pd.DataFrame] | None = None
-        self._simulation_start_date = pd.to_datetime(simulation_start_date)
+        self._simulation_start_date = pd.to_datetime(simulation_start_date).tz_localize("UTC")
 
     def _validate_all_data(self):
         for ticker, df in self.data.items():
@@ -46,17 +48,22 @@ class MarketData:
         # Align all DataFrames to the common index
         self._dates = common_index
         for ticker in self.data.keys():
-            self.data[ticker] = self.data[ticker].reindex(common_index)
+            df = self.data[ticker].reindex(common_index).copy()
+            df['SEQ'] = range(len(df))
+            self.data[ticker] = df
 
     def get_market_data(self,
                         tickers: List[str],
-                        start_date: str,
-                        end_date: str) -> None:
+                        end_date: str,
+                        start_date: Optional[str] = None,
+                        interval: str = '1d',
+                        period: str = '5y') -> None:
         """
         Create MarketData by fetching from a DataIngestionManager.
         """
         tickers = [t.strip().upper() for t in tickers]
-        raw_data: Dict[str, pd.DataFrame] = self._ingestion_manager.get_data(tickers, start_date, end_date)
+
+        raw_data: Dict[str, pd.DataFrame] = self._ingestion_manager.get_data(tickers=tickers, start_date=start_date, end_date=end_date, interval=interval, period=period)
 
         # Populate and validate the raw data
         self.data = raw_data
@@ -84,11 +91,12 @@ class MarketData:
     def get_available_symbols(self) -> list:
         return list(self.data.keys())
 
-    def get_history(self, ticker_list: List[str], end_date: pd.Timestamp, lookback: int) -> Dict[str, pd.DataFrame]:
+    def get_history(self, ticker_list: List[str], end_date: str, lookback: int) -> Dict[str, pd.DataFrame]:
         """
         Return historical price data for a ticker ending on `end_date` and going back `lookback` days.
         """
         historical_data = {}
+
         for ticker in ticker_list:
             if ticker not in self.data:
                 raise ValueError(f"ticker {ticker} not found in market data.")
@@ -98,14 +106,19 @@ class MarketData:
                 raise ValueError("lookback must be a positive integer.")
             if lookback > len(self.data[ticker]):
                 raise ValueError(f"lookback {lookback} exceeds available data length for ticker {ticker}.")
-            # Calculate start date based on lookback period
-            if lookback == 0:
-                start_date = end_date
-            else:
-                end_date = pd.to_datetime(end_date)
-                start_date = end_date - pd.Timedelta(days=lookback)
-            if ticker not in historical_data:
-                historical_data[ticker] = self.data[ticker].loc[start_date:end_date].copy()
+            # Calculate start date based on a lookback period
+            idx = self.data[ticker].loc[end_date]['SEQ']
+            historical_data[ticker] = self.data[ticker][
+                (self.data[ticker]['SEQ'] > idx - lookback) &
+                (self.data[ticker]['SEQ'] <= idx)
+            ]
+            # if lookback == 0:
+            #     start_date = end_date
+            # else:
+            #     end_date = pd.to_datetime(end_date)
+            #     start_date = end_date - pd.Timedelta(days=lookback)
+            # if ticker not in historical_data:
+            #     historical_data[ticker] = self.data[ticker].loc[start_date:end_date].copy()
         return historical_data
 
     def get_all_data(self) -> Dict[str, pd.DataFrame]:

@@ -11,9 +11,9 @@ from strategies.base import StrategyBase, StrategyFactory
 @StrategyFactory.register("stoploss")
 class StoplossStrategy(StrategyBase, ABC):
     def __init__(self, **kwargs):
-        self.lookback_period = 7
+        self.lookback_period = 20
         self.has_bought: Optional[float] = None
-        self.trail_pct: float = kwargs.get("trail_pct", 0.04)
+        self.trail_pct: float = kwargs.get("trail_pct", 0.07)
 
     def get_name(self) -> str:
         return "stoploss"
@@ -47,12 +47,15 @@ class StoplossStrategy(StrategyBase, ABC):
                 self.has_bought = cur_price
 
         else:
-            pct_change = price_data[ticker]['Close'].pct_change().dropna()
-            avg_pct_change = pct_change.mean()
-            cur_pct_change = pct_change[-int(self.lookback_period/2):].mean()
-            if cur_pct_change > 0 and cur_pct_change > avg_pct_change:
-                cur_price = price_data[ticker]['Close'].loc[current_date]
-                signals[ticker] = int(cash / cur_price)
-                self.has_bought = cur_price
+            try:
+                pct_change = price_data[ticker]['Close'].pct_change().dropna()
+                avg_pct_change = pct_change.mean()
+                cur_pct_change = pct_change[-int(self.lookback_period/2):].mean()
+                if cur_pct_change > 0 and cur_pct_change > avg_pct_change:
+                    cur_price = price_data[ticker]['Close'].loc[current_date]
+                    signals[ticker] = int(cash / cur_price)
+                    self.has_bought = cur_price
+            except Exception as e:
+                print('here')
 
         return signals

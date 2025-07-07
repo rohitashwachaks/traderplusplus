@@ -1,5 +1,6 @@
 import argparse
 import os
+from datetime import datetime
 from typing import Optional
 
 from analytics.performance_evaluator import PerformanceEvaluator
@@ -18,9 +19,11 @@ def parse_args():
     parser.add_argument("--strategy", type=str, default="momentum", help="Strategy name (e.g. momentum)")
     parser.add_argument("--tickers", type=str, default="AAPL", help="Comma-separated list of tickers (e.g. AAPL,MSFT)")
     parser.add_argument("--start", type=str, default="2023-01-01", help="Start date (YYYY-MM-DD)")
-    parser.add_argument("--end", type=str, default="2023-12-31", help="End date (YYYY-MM-DD)")
+    parser.add_argument("--end", type=str, default=datetime.now().strftime('%Y-%m-%d'), help="End date (YYYY-MM-DD)")
+    parser.add_argument("--interval", type=str, default="1d", help="polling interval: 1m, 1d, 1wk, 1mo")
+    parser.add_argument("--period", type=str, default="5y", help="polling interval: 1m, 1d, 1wk, 1mo")
     parser.add_argument("--cash", type=float, default=100000.0, help="Starting cash (default: 100000)")
-    parser.add_argument("--benchmark", type=str, default="SPY", help="Benchmark ticker for performance comparison (default: SPY)")
+    parser.add_argument("--benchmark", type=str, default=None, help="Benchmark ticker for performance comparison (default: SPY)")
     parser.add_argument("--guardrail", type=Optional[str], default=None, help="Guardrail strategy (e.g. trailing_stop_loss)")
     parser.add_argument("--source", type=str, default="yahoo", help="Data source: yahoo | polygon")
     parser.add_argument("--refresh", action="store_true", help="Force data refresh (ignore cache)")
@@ -59,7 +62,7 @@ def main():
 
     # --- Backtester Setup ---
     bt = Backtester(strategy=strategy, market_data=market_data, portfolio=portfolio, executor=executor)
-    bt.run(start_date=args.start, end_date=args.end)
+    bt.run(start_date=args.start, end_date=args.end, interval=args.interval, period=args.period)
 
     # --- Backtest Results ---
     print(f"\n🚀 Backtest completed for {portfolio.name} with {len(tickers)} tickers ({', '.join(tickers)}) from {args.start} to {args.end}")
