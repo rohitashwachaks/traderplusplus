@@ -201,7 +201,9 @@ def plotly_interactive_equity(equity_curve: pd.Series,
     fig.write_html(html_path)
     print(f"Interactive plot saved to {html_path}")
 
-    return fig
+    # Explicitly set figure to None to help with garbage collection
+    # This should help prevent semaphore leaks
+    fig = None
 
 
 def plotly_equity_vs_benchmark(
@@ -263,4 +265,6 @@ def plotly_equity_vs_benchmark(
     fig.write_html(html_path)
     print(f"Interactive plot saved to {html_path}")
 
-    return fig
+    # Explicitly set figure to None to help with garbage collection
+    # This should help prevent semaphore leaks
+    fig = None

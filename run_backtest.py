@@ -63,7 +63,7 @@ def main():
     bt.run(start_date=args.start, end_date=args.end)
 
     # --- Backtest Results ---
-    print(f"\n🚀 Backtest completed for {portfolio.name} with {len(tickers)} tickers from {args.start} to {args.end}")
+    print(f"\n🚀 Backtest completed for {portfolio.name} with {len(tickers)} tickers ({', '.join(tickers)}) from {args.start} to {args.end}")
     print(f"💰 Starting Cash: ${args.cash:,.2f}")
     print(f"📈 Final Net Worth: ${bt.get_final_net_worth():,.2f}")
 
