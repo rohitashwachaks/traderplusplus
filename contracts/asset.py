@@ -1,7 +1,7 @@
 from abc import ABC
 from typing import Type, Optional
 
-from contracts.utils import clean_ticker
+from utils.utils import clean_ticker
 
 
 class AssetBase(ABC):

@@ -4,9 +4,9 @@ from typing import Optional
 
 from analytics.performance_evaluator import PerformanceEvaluator
 from core.backtester import Backtester
-from core.executors.backtest import BacktestExecutor
+from executors.backtest import BacktestExecutor
 from core.data_loader import DataIngestionManager
-from core.guardrails.trailing_stop_loss import TrailingStopLossGuardrail
+# from guardrails.trailing_stop_loss import TrailingStopLossGuardrail
 from core.market_data import MarketData
 from contracts.portfolio import Portfolio
 from core.visualizer import plot_drawdown, plotly_equity_vs_benchmark
@@ -54,9 +54,7 @@ def main():
     market_data = MarketData(ingestion, simulation_start_date=args.start)
 
     # --- Executor Setup ---
-    guardrails = None
-    # guardrails = [TrailingStopLossGuardrail()]
-    executor = BacktestExecutor(portfolio=portfolio, market_data=market_data, guardrails=guardrails)
+    executor = BacktestExecutor(portfolio=portfolio, market_data=market_data)
 
     # --- Backtester Setup ---
     bt = Backtester(strategy=strategy, market_data=market_data, portfolio=portfolio, executor=executor)
