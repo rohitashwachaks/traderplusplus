@@ -7,6 +7,8 @@ from matplotlib.dates import DateFormatter
 
 import plotly.graph_objects as go
 
+from utils.config import FIGURE_DIR
+
 
 def _validate_equity_series(equity_curve: pd.Series):
     if not isinstance(equity_curve, pd.Series):
@@ -22,9 +24,9 @@ def _finalize_plot(title: str):
         plt.tight_layout()
     except RecursionError:
         print("⚠️ Warning: RecursionError in tight_layout. Skipping layout auto-adjust.")
-    os.makedirs("./figures", exist_ok=True)
+    os.makedirs(FIGURE_DIR, exist_ok=True)
     safe_title = title.lower().replace(" ", "_")
-    plt.savefig(f"./figures/{safe_title}.png")
+    plt.savefig(os.path.join(FIGURE_DIR, f"{safe_title}.png"))
     fig = plt.gcf()
     plt.close()
     return fig
@@ -195,9 +197,9 @@ def plotly_interactive_equity(equity_curve: pd.Series,
 
     # Save the figure to an HTML file instead of showing it directly
     # This avoids potential semaphore leaks from fig.show()
-    os.makedirs("./figures", exist_ok=True)
+    os.makedirs(FIGURE_DIR, exist_ok=True)
     safe_title = title.lower().replace(" ", "_")
-    html_path = f"./figures/{safe_title}.html"
+    html_path = os.path.join(FIGURE_DIR, f"{safe_title}.html")
     fig.write_html(html_path)
     print(f"Interactive plot saved to {html_path}")
 
@@ -259,9 +261,9 @@ def plotly_equity_vs_benchmark(
 
     # Save the figure to an HTML file instead of showing it directly
     # This avoids potential semaphore leaks from fig.show()
-    os.makedirs("./figures", exist_ok=True)
+    os.makedirs(FIGURE_DIR, exist_ok=True)
     safe_title = title.lower().replace(" ", "_")
-    html_path = f"./figures/{safe_title}.html"
+    html_path = os.path.join(FIGURE_DIR, f"{safe_title}.html")
     fig.write_html(html_path)
     print(f"Interactive plot saved to {html_path}")
 

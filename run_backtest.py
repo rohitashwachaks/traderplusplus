@@ -10,6 +10,7 @@ from core.data_loader import DataIngestionManager
 from core.market_data import MarketData
 from contracts.portfolio import Portfolio
 from core.visualizer import plot_drawdown, plotly_equity_vs_benchmark
+from utils.config import LOG_DIR
 
 
 def parse_args():
@@ -68,9 +69,9 @@ def main():
     equity_curve = bt.get_equity_curve()
     trade_log = bt.get_trade_log()
     if args.export:
-        os.makedirs('./logs', exist_ok=True)
-        equity_curve.to_csv("./logs/equity_curve.csv")
-        trade_log.to_csv("./logs/trade_log.csv")
+        os.makedirs(LOG_DIR, exist_ok=True)
+        equity_curve.to_csv(os.path.join(LOG_DIR, "equity_curve.csv"))
+        trade_log.to_csv(os.path.join(LOG_DIR, "trade_log.csv"))
         print("✅ Exported equity_curve.csv and trade_log.csv")
     if args.plot:
         net_worth_series = equity_curve['net_worth']

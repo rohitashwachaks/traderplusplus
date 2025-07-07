@@ -1,3 +1,6 @@
+import importlib
+import inspect
+import pkgutil
 from abc import ABC, abstractmethod
 import pandas as pd
 from typing import Dict, Optional
@@ -58,12 +61,24 @@ class StrategyBase(ABC):
 class StrategyFactory:
     _registry = {}
 
+    # @classmethod
+    # def __init__(cls):
+    #     for loader, module_name, is_pkg in pkgutil.iter_modules(__path__):
+    #         module = importlib.import_module(f"{__name__}.{module_name}")
+    #         for name, obj in inspect.getmembers(module):
+    #             if inspect.isclass(obj) and name.endswith("Strategy"):
+    #                 cls._registry[name] = obj
+
     @classmethod
     def register(cls, name):
         def decorator(strategy_cls):
             cls._registry[name] = strategy_cls
             return strategy_cls
         return decorator
+
+    @classmethod
+    def register_strategy(cls, name, strategy_cls):
+        cls._registry[name] = strategy_cls
 
     @classmethod
     def create_strategy(cls, name: str, **kwargs) -> StrategyBase:
@@ -78,3 +93,5 @@ class StrategyFactory:
         :return:
         """
         return set(cls._registry.keys())
+
+# StrategyFactory()
