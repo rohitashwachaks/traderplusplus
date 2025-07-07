@@ -7,7 +7,7 @@
 # from core.market_data import MarketData
 # from core.visualizer import plot_equity_curve, plot_per_asset_equity, plot_equity_with_trades, \
 #     plotly_interactive_equity, plot_drawdown
-# from strategies.stock.base import StrategyFactory
+# from strategies.multi_asset.base import StrategyFactory
 # from utils.metrics import summarize_metrics
 # from contracts.portfolio import Portfolio
 # from core.executors.backtest import BacktestExecutor

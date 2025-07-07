@@ -1,7 +1,7 @@
 from typing import Dict
 
 from contracts.asset import Asset
-from core.guardrails.base import GuardrailBase, GuardrailFactory
+from guardrails.base import GuardrailBase, GuardrailFactory
 
 
 @GuardrailFactory.register("trailing_stop_loss")
