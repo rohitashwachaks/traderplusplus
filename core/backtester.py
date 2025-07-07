@@ -2,12 +2,12 @@ from typing import List
 import pandas as pd
 from tqdm import tqdm
 
-from core.executors.backtest import BacktestExecutor
-from core.executors.base import BaseExecutor
+from executors.backtest import BacktestExecutor
+from executors.base import BaseExecutor
 from core.market_data import MarketData
 from contracts.portfolio import Portfolio
 from contracts.order import Order, OrderSide, OrderType
-from strategies.stock import StrategyBase
+from strategies.base import StrategyBase
 
 
 class Backtester:
