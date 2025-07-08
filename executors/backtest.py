@@ -1,7 +1,7 @@
 from .base import BaseExecutor
 from contracts.order import Order, OrderResult, OrderStatus, OrderType
 from contracts.portfolio import Portfolio
-from core.guardrails.base import GuardrailBase
+from guardrails.base import GuardrailBase
 from core.market_data import MarketData
 from datetime import datetime
 import pandas as pd
@@ -16,10 +16,9 @@ class BacktestExecutor(BaseExecutor):
     It does not interact with any live market or broker API.
     Instead, it simulates order execution by filling orders at historical prices.
     """
-    def __init__(self, portfolio: Portfolio, market_data: MarketData, guardrails=None):
+    def __init__(self, portfolio: Portfolio, market_data: MarketData):
         self.portfolio = portfolio
         self.market_data = market_data
-        self.guardrails = guardrails or []
         self.orders = {}  # order_id -> Order
         self.order_status = {}  # order_id -> OrderStatus
         self.fills = {}  # order_id -> OrderResult
@@ -59,14 +58,7 @@ class BacktestExecutor(BaseExecutor):
                 continue
             fill_qty = order.quantity
             avg_fill_price = price
-            # Guardrails (if any)
-            for guardrail in self.guardrails:
-                if hasattr(guardrail, 'evaluate') and not guardrail.evaluate(self.portfolio.positions,
-                                                                             {order.ticker: price}):
-                    self.order_status[order_id] = OrderStatus.REJECTED
-                    self.fills[order_id] = OrderResult(order_id=order_id, status=OrderStatus.REJECTED,
-                                                       message='GuardrailBase blocked order')
-                    continue
+
             try:
                 self.portfolio.execute_trade(current_time, order, avg_fill_price, note='Backtest Fill')
 

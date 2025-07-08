@@ -1,15 +1,17 @@
 import argparse
 import os
+from datetime import datetime
 from typing import Optional
 
 from analytics.performance_evaluator import PerformanceEvaluator
 from core.backtester import Backtester
-from core.executors.backtest import BacktestExecutor
+from executors.backtest import BacktestExecutor
 from core.data_loader import DataIngestionManager
-from core.guardrails.trailing_stop_loss import TrailingStopLossGuardrail
+# from guardrails.trailing_stop_loss import TrailingStopLossGuardrail
 from core.market_data import MarketData
 from contracts.portfolio import Portfolio
 from core.visualizer import plot_drawdown, plotly_equity_vs_benchmark
+from utils.config import LOG_DIR
 
 
 def parse_args():
@@ -17,9 +19,11 @@ def parse_args():
     parser.add_argument("--strategy", type=str, default="momentum", help="Strategy name (e.g. momentum)")
     parser.add_argument("--tickers", type=str, default="AAPL", help="Comma-separated list of tickers (e.g. AAPL,MSFT)")
     parser.add_argument("--start", type=str, default="2023-01-01", help="Start date (YYYY-MM-DD)")
-    parser.add_argument("--end", type=str, default="2023-12-31", help="End date (YYYY-MM-DD)")
+    parser.add_argument("--end", type=str, default=datetime.now().strftime('%Y-%m-%d'), help="End date (YYYY-MM-DD)")
+    parser.add_argument("--interval", type=str, default="1d", help="polling interval: 1m, 1d, 1wk, 1mo")
+    parser.add_argument("--period", type=str, default="5y", help="polling interval: 1m, 1d, 1wk, 1mo")
     parser.add_argument("--cash", type=float, default=100000.0, help="Starting cash (default: 100000)")
-    parser.add_argument("--benchmark", type=str, default="SPY", help="Benchmark ticker for performance comparison (default: SPY)")
+    parser.add_argument("--benchmark", type=str, default=None, help="Benchmark ticker for performance comparison (default: SPY)")
     parser.add_argument("--guardrail", type=Optional[str], default=None, help="Guardrail strategy (e.g. trailing_stop_loss)")
     parser.add_argument("--source", type=str, default="yahoo", help="Data source: yahoo | polygon")
     parser.add_argument("--refresh", action="store_true", help="Force data refresh (ignore cache)")
@@ -54,25 +58,23 @@ def main():
     market_data = MarketData(ingestion, simulation_start_date=args.start)
 
     # --- Executor Setup ---
-    guardrails = None
-    # guardrails = [TrailingStopLossGuardrail()]
-    executor = BacktestExecutor(portfolio=portfolio, market_data=market_data, guardrails=guardrails)
+    executor = BacktestExecutor(portfolio=portfolio, market_data=market_data)
 
     # --- Backtester Setup ---
     bt = Backtester(strategy=strategy, market_data=market_data, portfolio=portfolio, executor=executor)
-    bt.run(start_date=args.start, end_date=args.end)
+    bt.run(start_date=args.start, end_date=args.end, interval=args.interval, period=args.period)
 
     # --- Backtest Results ---
-    print(f"\n🚀 Backtest completed for {portfolio.name} with {len(tickers)} tickers from {args.start} to {args.end}")
+    print(f"\n🚀 Backtest completed for {portfolio.name} with {len(tickers)} tickers ({', '.join(tickers)}) from {args.start} to {args.end}")
     print(f"💰 Starting Cash: ${args.cash:,.2f}")
     print(f"📈 Final Net Worth: ${bt.get_final_net_worth():,.2f}")
 
     equity_curve = bt.get_equity_curve()
     trade_log = bt.get_trade_log()
     if args.export:
-        os.makedirs('./logs', exist_ok=True)
-        equity_curve.to_csv("./logs/equity_curve.csv")
-        trade_log.to_csv("./logs/trade_log.csv")
+        os.makedirs(LOG_DIR, exist_ok=True)
+        equity_curve.to_csv(os.path.join(LOG_DIR, "equity_curve.csv"))
+        trade_log.to_csv(os.path.join(LOG_DIR, "trade_log.csv"))
         print("✅ Exported equity_curve.csv and trade_log.csv")
     if args.plot:
         net_worth_series = equity_curve['net_worth']

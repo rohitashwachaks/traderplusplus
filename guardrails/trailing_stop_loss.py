@@ -1,12 +1,13 @@
 from typing import Dict
 
 from contracts.asset import Asset
-from core.guardrails.base import GuardrailBase, GuardrailFactory
+from guardrails.base import GuardrailBase, GuardrailFactory
 
 
 @GuardrailFactory.register("trailing_stop_loss")
 class TrailingStopLossGuardrail(GuardrailBase):
-    def __init__(self, stop_pct: float = 0.05):
+    def __init__(self, stop_pct: float = 0.07):
+        super().__init__()
         self.stop_pct = stop_pct
         self.entry_prices = {}
         self.highest_since_entry = {}

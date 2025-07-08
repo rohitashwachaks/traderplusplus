@@ -4,9 +4,9 @@ from typing import Dict, List, Optional
 
 from contracts.asset import Asset, CashAsset
 from contracts.order import Order
-from contracts.utils import clean_ticker
-from core.guardrails.base import GuardrailFactory
-from strategies.stock.base import StrategyBase, StrategyFactory
+from utils.utils import clean_ticker
+from guardrails.base import GuardrailFactory
+from strategies.base import StrategyBase, StrategyFactory
 
 
 class Portfolio:
@@ -19,7 +19,7 @@ class Portfolio:
                  tickers: str | List[str],
                  starting_cash: float,
                  strategy: str,
-                 benchmark: str = "SPY",
+                 benchmark: Optional[str] = None,
                  guardrail: Optional[str] = None,
                  rebalance_freq: Optional[str] = None,
                  recomposition_freq: Optional[str] = None,
@@ -53,6 +53,7 @@ class Portfolio:
         self.strategy = StrategyFactory.create_strategy(strategy)
 
         # Initialise benchmark
+        benchmark = benchmark if benchmark else tickers[0]
         benchmark = clean_ticker(benchmark)
         assert isinstance(benchmark, str), "Benchmark must be a string"
         self.benchmark = benchmark

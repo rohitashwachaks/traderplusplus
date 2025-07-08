@@ -3,7 +3,7 @@ from typing import Dict, Optional
 import pandas as pd
 
 from contracts.asset import Asset
-from strategies.stock.base import StrategyBase, StrategyFactory
+from strategies.base import StrategyBase, StrategyFactory
 
 
 @StrategyFactory.register("capm")

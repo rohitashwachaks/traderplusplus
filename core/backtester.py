@@ -1,13 +1,13 @@
-from typing import List
+from typing import List, Optional
 import pandas as pd
 from tqdm import tqdm
 
-from core.executors.backtest import BacktestExecutor
-from core.executors.base import BaseExecutor
+from executors.backtest import BacktestExecutor
+from executors.base import BaseExecutor
 from core.market_data import MarketData
 from contracts.portfolio import Portfolio
 from contracts.order import Order, OrderSide, OrderType
-from strategies.stock import StrategyBase
+from strategies.base import StrategyBase
 
 
 class Backtester:
@@ -38,13 +38,9 @@ class Backtester:
         self.executor = executor
 
         self.tickers = portfolio.tickers
-        self.start_date = None
-        self.end_date = None
         self.signals = {}
 
-    def run(self, start_date: str, end_date: str):
-        self.start_date = pd.to_datetime(start_date)
-        self.end_date = pd.to_datetime(end_date)
+    def run(self, end_date: str, start_date: Optional[str] = None, interval='1d', period='5y'):
 
         # Fetch market data for all tickers
         # check for strategy lok-back period, if any, and adjust start_date accordingly
@@ -56,7 +52,8 @@ class Backtester:
             else:
                 raise ValueError("lookback_period must be an integer representing days")
         self.market_data.get_market_data(self.tickers + [self.portfolio.benchmark],
-                                         start_date=start_date, end_date=end_date)
+                                         start_date=start_date, end_date=end_date,
+                                         interval=interval, period=period)
 
         # Iterate through the common index dates
         for current_date in tqdm(self.market_data.dates):
@@ -64,7 +61,12 @@ class Backtester:
                 # Generate slice of
                 # --- MARKET DATA: FETCH HISTORICAL DATA FOR ALL TICKERS ---
                 # current_date = pd.to_datetime(current_date)
-                historical_data = self.market_data.get_history(self.tickers, end_date=current_date, lookback=self.strategy.lookback_period)
+
+                historical_data = self.market_data.get_history(self.tickers, lookback=self.strategy.lookback_period, end_date=current_date)
+                if not historical_data:
+                    continue
+
+                # current_date = historical_data.iloc[-1].name
 
                 # --- PURE STRATEGY: ONLY GENERATE SIGNALS ---
                 signals = self.strategy.generate_signals(historical_data, current_date=current_date,

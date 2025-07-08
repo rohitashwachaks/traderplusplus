@@ -5,13 +5,13 @@
 # from core.backtester import Backtester
 # from core.data_loader import DataIngestionManager
 # from core.market_data import MarketData
-# from core.guardrails.base import GuardrailBase
-# from core.guardrails.trailing_stop_loss import TrailingStopLossGuardrail
+# from guardrails.base import GuardrailBase
+# from guardrails.trailing_stop_loss import TrailingStopLossGuardrail
 # from core.visualizer import plot_equity_curve, plot_drawdown, plotly_interactive_equity
-# from strategies.stock.base import StrategyFactory
+# from strategies.multi_asset.base import StrategyFactory
 # from utils.metrics import summarize_metrics
-# from core.executors.backtest import BacktestExecutor
-# from core.executors.paper import PaperExecutor
+# from executors.backtest import BacktestExecutor
+# from executors.paper import PaperExecutor
 
 # st.set_page_config(layout="wide", page_title="Trader++ Strategy Lab")
 # st.title("📈 Trader++ Strategy Dashboard")
