@@ -87,16 +87,16 @@ Trader++ isn’t just another backtesting tool. It’s a full-fledged quant trad
 
 ## 🚦 MVP Status (June 2025)
 
-| Feature                           | Status      | Notes                                                                                                          |
-|-----------------------------------|-------------|----------------------------------------------------------------------------------------------------------------|
-| Unified Execution Engine          | ✅ Complete | Backtest, Paper, Live modes implemented with shared API. Paper & Live mode requires broker API implementation. |
+| Feature                           | Status     | Notes                                                                                                          |
+|-----------------------------------|------------|----------------------------------------------------------------------------------------------------------------|
+| Unified Execution Engine          | ⚠️ Partial | Backtest, Paper, Live modes implemented with shared API. Paper & Live mode requires broker API implementation. |
 | Modular Strategy Framework        | ✅ Complete | StrategyBase and example strategies present. Plug-and-play.                                                    |
 | Portfolio/Risk Management         | ✅ Complete | Portfolio class, guardrails, position sizing hooks implemented.                                                |
 | Analytics & Attribution           | ✅ Partial  | Core metrics (Sharpe, alpha, etc.) present. Some advanced analytics in progress.                               |
 | Interactive Dashboard             | ⚠️ Partial | Streamlit app exists, some features stubbed or in progress.                                                    |
 | Scalable Simulation Engine        | ⚠️ Partial | Event-driven core present; multiprocessing support basic or planned.                                           |
 | Data Layer                        | ✅ Complete | Data ingestion, caching, and basic adapters present.                                                           |
-| ML/DSL Integration                | 🚧 Planned  | ML model integration and YAML/DSL loader planned.                                                              |
+| ML/DSL Integration                | 🚧 Planned | ML model integration and YAML/DSL loader planned.                                                              |
 
 ---
 
@@ -182,8 +182,8 @@ flowchart TD
 
 ## 🔧 Core Components
 
-| Module            | Purpose                                                                 |
-|-------------------|-------------------------------------------------------------------------|
+| Module            | Purpose                                                                  |
+|-------------------|--------------------------------------------------------------------------|
 | Portfolio         | Tracks assets, cash, trades, and strategy metadata. Self-contained unit. |
 | PortfolioExecutor | Orchestrates strategy execution, manages trade logic, evaluates guards.  |
 | MarketData        | Historical price data & sliding window views for strategies.             |
@@ -212,15 +212,18 @@ flowchart TD
    ```
 2. **Run a Backtest**
    ```bash
-   python main.py --start=2022-05-29 --end=2025-05-29 --cash 50000 --plot --export --tickers=META --refresh --strategy=momentum --benchmark=META --guardrail=trailing_stop_loss
+   python run_backtest.py --start=2022-05-29 --end=2025-05-29 --cash 50000 --plot --export --tickers=META --refresh --strategy=momentum --benchmark=META --guardrail=trailing_stop_loss
+   ```
+   ```bash
+   python run_backtest.py --start=2025-01-01 --cash 50000 --plot --export --tickers=RDDT --refresh --strategy=stoploss --interval=1hr --source=polygon
    ```
 3. **Add a New Strategy**
    - Implement a new class in `strategies/` inheriting from `StrategyBase` and implementing `generate_signals()`.
-   - Register your strategy by importing it in `strategies/__init__.py`.
+   - Register your strategy by using the decorator: `@StrategyFactory.register(<<STRATEGY_NAME>>)`
 
 4  **Add a New Guardrail**
    - Implement a new class in `guardrails/` inheriting from `GuardrailBase` and implementing `evaluate()`.
-   - Register your guardrail by importing it in `guardrails/__init__.py`.
+   - Register your guardrail by importing it in `guardrails/__init__.py`. _[To be deprecated soon. Auto-register will be added]_
 ---
 
 ## 🤝 Contributing
