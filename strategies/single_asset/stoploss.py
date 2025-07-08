@@ -13,7 +13,7 @@ class StoplossStrategy(StrategyBase, ABC):
     def __init__(self, **kwargs):
         self.lookback_period = 20
         self.has_bought: Optional[float] = None
-        self.trail_pct: float = kwargs.get("trail_pct", 0.07)
+        self.trail_pct: float = kwargs.get("trail_pct", 0.03)
 
     def get_name(self) -> str:
         return "stoploss"
