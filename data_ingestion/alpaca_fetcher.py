@@ -4,7 +4,7 @@ import requests
 from dotenv import load_dotenv
 
 
-def fetch_alpaca_data(ticker: str, start_date: str, end_date: str, timeframe: str = "1Day") -> pd.DataFrame:
+def fetch_alpaca_data(ticker: str, start_date: str, end_date: str, interval: str = "1Day") -> pd.DataFrame:
     """
     Fetch historical OHLCV data from Alpaca for a given ticker and date range.
     Requires ALPACA_API_KEY and ALPACA_API_SECRET in environment or .env.
@@ -26,7 +26,7 @@ def fetch_alpaca_data(ticker: str, start_date: str, end_date: str, timeframe: st
     params = {
         "start": start_date,
         "end": end_date,
-        "timeframe": timeframe,
+        "timeframe": interval,
         "adjustment": "all",
         "limit": 10000
     }

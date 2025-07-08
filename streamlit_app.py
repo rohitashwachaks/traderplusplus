@@ -8,7 +8,7 @@
 # from guardrails.base import GuardrailBase
 # from guardrails.trailing_stop_loss import TrailingStopLossGuardrail
 # from core.visualizer import plot_equity_curve, plot_drawdown, plotly_interactive_equity
-# from strategies.stock.base import StrategyFactory
+# from strategies.multi_asset.base import StrategyFactory
 # from utils.metrics import summarize_metrics
 # from executors.backtest import BacktestExecutor
 # from executors.paper import PaperExecutor

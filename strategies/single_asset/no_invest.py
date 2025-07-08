@@ -5,7 +5,7 @@ import pandas as pd
 
 from contracts.asset import Asset, CashAsset
 from core.market_data import MarketData
-from strategies.stock.base import StrategyBase, StrategyFactory
+from strategies.base import StrategyBase, StrategyFactory
 
 
 @StrategyFactory.register("hold_cash")

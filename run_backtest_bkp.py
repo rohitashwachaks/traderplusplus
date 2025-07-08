@@ -7,7 +7,7 @@
 # from core.market_data import MarketData
 # from core.visualizer import plot_equity_curve, plot_per_asset_equity, plot_equity_with_trades, \
 #     plotly_interactive_equity, plot_drawdown
-# from strategies.stock.base import StrategyFactory
+# from strategies.multi_asset.base import StrategyFactory
 # from utils.metrics import summarize_metrics
 # from contracts.portfolio import Portfolio
 # from executors.backtest import BacktestExecutor
@@ -81,9 +81,9 @@
 #     print(f"\n💰 Starting Cash: ${args.cash:,.2f}")
 #     print(f"\n📈 Final Net Worth: ${bt.get_final_net_worth():,.2f}")
 #     if args.export:
-#         os.makedirs('./logs', exist_ok=True)
-#         equity_curve.to_csv("./logs/equity_curve.csv")
-#         trade_log.to_csv("./logs/trade_log.csv")
+#         os.makedirs(LOG_DIR, exist_ok=True)
+#         equity_curve.to_csv(os.path.join(LOG_DIR, "equity_curve.csv"))
+#         trade_log.to_csv(os.path.join(LOG_DIR, "trade_log.csv"))
 #         print("✅ Exported equity_curve.csv and trade_log.csv")
 #     if args.plot:
 #         net_worth_series = equity_curve['net_worth']

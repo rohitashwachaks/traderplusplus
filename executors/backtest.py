@@ -1,8 +1,9 @@
-from guardrails.base import GuardrailFactory
 from .base import BaseExecutor
-from contracts.order import Order, OrderResult, OrderStatus
+from contracts.order import Order, OrderResult, OrderStatus, OrderType
 from contracts.portfolio import Portfolio
+from guardrails.base import GuardrailBase
 from core.market_data import MarketData
+from datetime import datetime
 import pandas as pd
 import uuid
 
@@ -31,11 +32,10 @@ class BacktestExecutor(BaseExecutor):
         return order_id
 
     def cancel_order(self, order_id):
-        resp = False
         if order_id in self.orders and self.order_status[order_id] not in [OrderStatus.FILLED, OrderStatus.CANCELLED]:
             self.order_status[order_id] = OrderStatus.CANCELLED
-            resp = True
-        return resp
+            return True
+        return False
 
     def get_portfolio(self):
         return self.portfolio
@@ -60,21 +60,6 @@ class BacktestExecutor(BaseExecutor):
             avg_fill_price = price
 
             try:
-                # is_rejected: bool = False
-                # # Guardrails (if any)
-                # for guardrail in self.guardrails:
-                #     if guardrail.evaluate(self.portfolio.positions, {order.ticker: price}):
-                #         self.order_status[order_id] = OrderStatus.REJECTED
-                #         self.fills[order_id] = OrderResult(order_id=order_id, status=OrderStatus.REJECTED,
-                #                                            message=f'Guardrail {guardrail.name} blocked order')
-                #         is_rejected = True
-                #         break
-                # if is_rejected:
-                #     continue
-
-                if self.order_status.get(order_id, '') == OrderStatus.REJECTED:
-                    continue
-
                 self.portfolio.execute_trade(current_time, order, avg_fill_price, note='Backtest Fill')
 
                 self.order_status[order_id] = OrderStatus.FILLED

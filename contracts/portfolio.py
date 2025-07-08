@@ -4,9 +4,9 @@ from typing import Dict, List, Optional
 
 from contracts.asset import Asset, CashAsset
 from contracts.order import Order
-from contracts.utils import clean_ticker
+from utils.utils import clean_ticker
 from guardrails.base import GuardrailFactory
-from strategies.stock.base import StrategyBase, StrategyFactory
+from strategies.base import StrategyBase, StrategyFactory
 
 
 class Portfolio:
@@ -19,11 +19,11 @@ class Portfolio:
                  tickers: str | List[str],
                  starting_cash: float,
                  strategy: str,
-                 benchmark: str = "SPY",
+                 benchmark: Optional[str] = None,
+                 guardrail: Optional[str] = None,
                  rebalance_freq: Optional[str] = None,
                  recomposition_freq: Optional[str] = None,
-                 metadata: Dict = None,
-                 guardrails=None):
+                 metadata: Dict = None):
         """
         Initialize a Portfolio object.
 
@@ -53,21 +53,15 @@ class Portfolio:
         self.strategy = StrategyFactory.create_strategy(strategy)
 
         # Initialise benchmark
+        benchmark = benchmark if benchmark else tickers[0]
         benchmark = clean_ticker(benchmark)
         assert isinstance(benchmark, str), "Benchmark must be a string"
         self.benchmark = benchmark
 
         # Initialize guardrail
-        self.guardrails = []  # List of guardrails
-        if guardrails:
-            guardrails = {t.strip() for t in guardrails.split(",")}
-            invalid_guardrails = guardrails - GuardrailFactory.get_supported_guardrails()
-            assert len(
-                invalid_guardrails) == 0, f"Unsupported guardrails: {invalid_guardrails}. Supported guardrails: {GuardrailFactory.get_supported_guardrails()}"
-            self.guardrails = [GuardrailFactory.create_guardrail(guardrail) for guardrail in guardrails]
-
-        guardrail_str = ', '.join([g.name for g in self.guardrails]) if self.guardrails else 'None'
-        print(f"Guardrails: {guardrail_str}")
+        if guardrail:
+            assert guardrail in GuardrailFactory.get_supported_guardrails(), f"Unsupported guardrail: {guardrail}. Supported guardrails: {GuardrailFactory.get_supported_guardrails()}"
+            self.guardrail = GuardrailFactory.create_guardrail(guardrail)
 
         self._positions: Dict[str, Asset | CashAsset] = {
             ticker: Asset(ticker)
@@ -190,22 +184,3 @@ class Portfolio:
         return self._positions
 
     # endregion Properties
-
-    def generate_signals_with_guardrails(self, historical_data, current_date):
-        # Step 1: Generate signals from the strategy
-        signals = self.strategy.generate_signals(
-            historical_data,
-            current_date=current_date,
-            positions=self.positions,
-            cash=self.cash
-        ) or {}
-
-        # Step 2: Run guardrail checks and overwrite signals if necessary
-        if self.guardrails:
-            current_prices = {ticker: historical_data[ticker]['Close'].iloc[-1] for ticker in self.tickers}
-            for guardrail in self.guardrails:
-                exits = guardrail.evaluate(self.positions, current_prices)
-                for ticker, should_exit in exits.items():
-                    if should_exit:
-                        signals[ticker] = -abs(self.positions[ticker].shares) if ticker in self.positions else 0
-        return signals

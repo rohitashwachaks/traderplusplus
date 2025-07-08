@@ -175,10 +175,8 @@ cython_debug/
 .idea/
 .qodo/
 /data_cache
-/figures
-/logs
+/output
 product_roadmap.md
 /run
-/logs
 /.run
 /.vscode

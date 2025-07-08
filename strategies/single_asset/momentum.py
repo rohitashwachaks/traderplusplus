@@ -5,12 +5,12 @@ from typing import Dict, Optional
 
 from contracts.asset import Asset, CashAsset
 from core.market_data import MarketData
-from strategies.stock.base import StrategyBase, StrategyFactory
+from strategies.base import StrategyBase, StrategyFactory
 
 
 @StrategyFactory.register("momentum")
 class MomentumStrategy(StrategyBase, ABC):
-    def __init__(self, short_window: int =5, long_window: int = 20, lookback_period: int = 60, **kwargs):
+    def __init__(self, short_window: int = 3, long_window: int = 10, lookback_period: int = 10, **kwargs):
         self.short_window = short_window
         self.long_window = long_window
         self.lookback_period = lookback_period
