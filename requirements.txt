@@ -12,3 +12,4 @@ streamlit
 pyfolio
 backtrader
 prefect
+pytest
