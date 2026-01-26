@@ -13,3 +13,7 @@ pyfolio
 backtrader
 prefect
 pytest
+fastapi
+uvicorn[standard]
+pydantic
+websockets
