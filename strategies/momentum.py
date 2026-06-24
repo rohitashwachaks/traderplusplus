@@ -10,7 +10,7 @@ class Momentum(TargetWeightStrategy):
 
     name = "momentum"
 
-    def __init__(self, short_window: int = 3, long_window: int = 10):
+    def __init__(self, short_window: int = 15, long_window: int = 30):
         if short_window >= long_window:
             raise ValueError("short_window must be < long_window")
         self.short_window = short_window
