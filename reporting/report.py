@@ -1,24 +1,32 @@
+import logging
 import os
 
 import matplotlib
 
 matplotlib.use("Agg")  # headless: write figures to disk, never open a window
 import matplotlib.pyplot as plt
+import pandas as pd
 import quantstats
 
+from reporting.interactive import write_equity_explorer
 
-def write_reports(res, out_dir: str, strat_name: str, bench_name: str) -> dict[str, str]:
+log = logging.getLogger("traderplusplus")
+
+
+def write_reports(res, out_dir: str, strat_name: str, bench_name: str, prices: pd.DataFrame) -> dict[str, str]:
     """Write the full report set for a finished backtest.
 
     Produces CSVs (equity curve, daily returns, bt stats table, quantstats metrics vs the
-    benchmark), PNGs (equity-vs-benchmark, drawdown), and a quantstats HTML tearsheet
-    covering the return distribution, drawdown, rolling Sharpe, and alpha/beta/risk.
+    benchmark), PNGs (equity-vs-benchmark, drawdown), a quantstats HTML tearsheet, and an
+    interactive HTML explorer (equity + holdings + trades, with per-day portfolio split on
+    hover).
 
     Args:
         res: the ``bt`` result holding the strategy and benchmark.
         out_dir: directory to write artifacts into (created if missing).
         strat_name: backtest name of the strategy.
         bench_name: backtest name of the benchmark.
+        prices: the underlying price panel, for the interactive explorer.
 
     Returns:
         Mapping of artifact label to file path.
@@ -34,28 +42,33 @@ def write_reports(res, out_dir: str, strat_name: str, bench_name: str) -> dict[s
         "equity_curve": os.path.join(out_dir, "equity_curve.csv"),
         "daily_returns": os.path.join(out_dir, "daily_returns.csv"),
         "stats": os.path.join(out_dir, "stats.csv"),
-        "metrics": os.path.join(out_dir, "metrics.csv"),
         "equity_png": os.path.join(out_dir, "equity_vs_benchmark.png"),
         "drawdown_png": os.path.join(out_dir, "drawdown.png"),
-        "tearsheet": os.path.join(out_dir, "tearsheet.html"),
+        "explorer": os.path.join(out_dir, "equity_explorer.html"),
     }
 
     equity.to_csv(paths["equity_curve"])
     returns.to_csv(paths["daily_returns"])
     res.stats.to_csv(paths["stats"])
-    quantstats.reports.metrics(
-        strat_returns, benchmark=bench_returns, mode="full", display=False
-    ).to_csv(paths["metrics"])
-
     _plot_equity(equity, paths["equity_png"])
     _plot_drawdown(equity[strat_name], strat_name, paths["drawdown_png"])
+    write_equity_explorer(res, prices, strat_name, bench_name, paths["explorer"])
 
-    quantstats.reports.html(
-        strat_returns,
-        benchmark=bench_returns,
-        output=paths["tearsheet"],
-        title=f"{strat_name} vs {bench_name}",
-    )
+    # quantstats' alpha/beta/tearsheet need return variance; a flat (all-cash) curve has
+    # none, so skip them explicitly rather than crash on the regression.
+    if strat_returns.dropna().nunique() <= 1:
+        log.warning("Strategy returns are flat (no variance) — skipping quantstats metrics "
+                    "and tearsheet (alpha/beta undefined). Other artifacts still written.")
+    else:
+        paths["metrics"] = os.path.join(out_dir, "metrics.csv")
+        paths["tearsheet"] = os.path.join(out_dir, "tearsheet.html")
+        quantstats.reports.metrics(
+            strat_returns, benchmark=bench_returns, mode="full", display=False
+        ).to_csv(paths["metrics"])
+        quantstats.reports.html(
+            strat_returns, benchmark=bench_returns, output=paths["tearsheet"],
+            title=f"{strat_name} vs {bench_name}",
+        )
     return paths
 
 
