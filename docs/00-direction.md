@@ -33,9 +33,10 @@ We **retired the hand-rolled backtest engine** and stand on proven libraries. Se
 The pipeline runs end-to-end: **data → price panel → strategy weights → `bt` → reports**.
 
 - `core/price_panel.py` — adapts the per-ticker OHLCV dict into a tz-naive close-price panel for `bt`.
-- `strategies/` — `TargetWeightStrategy` interface + registry (`base.py`), with `buy_n_hold` and `momentum`
-  (the latter applies a one-bar `.shift(1)` so signals never look ahead). Each strategy carries a
-  `rebalance_freq` and `reconstitution_freq` (default daily) — see `engine/frequency.py`.
+- `strategies/` — `TargetWeightStrategy` interface + registry (`base.py`), with `buy_n_hold`, `momentum`
+  (single-name SMA crossover) and `xs_momentum` (cross-sectional: rank a basket, hold the top names
+  equal-weighted, reconstituted monthly). All apply a one-bar `.shift(1)` so signals never look ahead. Each
+  strategy carries a `rebalance_freq` and `reconstitution_freq` (default daily) — see `engine/frequency.py`.
 - `guardrails/` — `Guardrail` interface + registry (`base.py`); `stop_loss.py` is a configurable
   trailing/fixed stop that overlays the weights (daily close-to-close, no look-ahead, exits to cash).
 - `engine/runner.py` — applies guardrails, reconstitution sampling and the rebalance Run-algo to the strategy
@@ -61,10 +62,9 @@ broken on this machine; invoke the interpreter by absolute path
 
 - [x] **0. Lock the baseline.** Captured the old engine's behaviour before replacing it.
 - [x] **1. Engine spike.** `bt` stood up on `buy_n_hold`/`momentum` fed by the existing data layer, with reports.
-- [ ] **2. Strategy + portfolio layer.** Build the real multi-ticker rebalancing strategy (cross-sectional
-      target weights, periodic reconstitution) and the **Portfolio comparison view** that runs several
-      strategies and compares their alpha/beta/Sharpe/risk side by side. *(Single-ticker path done; multi-asset
-      + comparison view are the next slice.)*
+- [~] **2. Strategy + portfolio layer.** `xs_momentum` delivers the real multi-ticker, cross-sectional,
+      periodically-reconstituted strategy. Still to do: the **Portfolio comparison view** that runs several
+      strategies and compares their alpha/beta/Sharpe/risk side by side.
 - [~] **3. Trust, tests & risk.** No-look-ahead + smoke tests exist; a configurable stop-loss guardrail
       (trailing/fixed) is in and tested. Still to do: return-reproducibility/golden files, more guardrails
       (max-drawdown, position caps), and CI.

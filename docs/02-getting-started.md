@@ -18,8 +18,10 @@ pandas ≥ 2.2.
 python run.py --strategy=momentum --tickers=AAPL --benchmark=SPY --start=2023-01-01 --end=2024-01-01 --out=output/momentum
 ```
 
-Flags: `--strategy` (`buy_n_hold` | `momentum`), `--tickers` (comma-separated), `--benchmark`, `--start`,
-`--end`, `--cash`, `--source` (`yahoo` | `polygon` | `alpaca`), `--interval`, `--out`.
+Flags: `--strategy` (`buy_n_hold` | `momentum` | `xs_momentum`), `--tickers` (comma-separated),
+`--benchmark`, `--start`, `--end`, `--cash`, `--source` (`yahoo` | `polygon` | `alpaca`), `--interval`,
+`--out`. `xs_momentum` is cross-sectional momentum: rank a basket by trailing return, hold the top names
+equal-weighted, reconstituted monthly — give it several tickers.
 
 **Rebalance / reconstitution (optional):** `--rebalance` and `--reconstitute` take `D|W|M|Q|Y` and override the
 strategy's defaults (both daily = trade whenever the signal changes). `--rebalance Q` trades back to target
