@@ -29,9 +29,20 @@ class TargetWeightStrategy(ABC):
     This is the single authoring interface: a strategy is *signal -> target weights*,
     which covers rebalancing/reconstitution and (later) screener / AI / news signals.
     The engine rebalances the portfolio toward whatever weights are returned.
+
+    Two frequencies tune *when* the engine acts (both default to daily = trade whenever the
+    signal changes). A strategy can override them as class attributes, e.g. a quarterly
+    rebalance with a yearly reconstitution sets ``rebalance_freq = "Q"`` and
+    ``reconstitution_freq = "Y"``:
+
+    - ``rebalance_freq`` — how often to trade back to the target weights (correct drift).
+    - ``reconstitution_freq`` — how often to recompute the target (the selection + weights),
+      held constant in between.
     """
 
     name: str
+    rebalance_freq: str = "D"
+    reconstitution_freq: str = "D"
 
     @abstractmethod
     def weights(self, prices: pd.DataFrame) -> pd.DataFrame:
