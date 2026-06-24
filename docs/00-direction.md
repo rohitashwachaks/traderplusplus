@@ -17,42 +17,67 @@ Constraints that drive every decision:
 - **Trajectory:** research backtest → automated paper trading → live paper trading. Broker behind a thin,
   swappable interface (Alpaca paper first; IBKR a later swap).
 
-## The pivot: adopt a proven engine
+## The pivot (done): proven engine instead of a hand-rolled loop
 
-We are **retiring the hand-rolled backtest engine** and standing on proven libraries. Maintaining a bespoke
-event loop is not where the value is, and a battle-tested engine retires our biggest trust risks for free.
-
-Settled stack:
+We **retired the hand-rolled backtest engine** and stand on proven libraries. Settled stack, now live:
 
 - **Engine:** [`bt`](https://pmorissette.github.io/bt/) — rebalancing-first, composable `Algo`s, multi-asset,
-  free. A custom `Algo` turns any external score (screener / AI / news) into target weights.
+  free. `WeighTarget` turns any score (screener / AI / news) into target weights.
 - **Metrics:** `ffn` + `quantstats` — no hand-maintained Sharpe/alpha/beta/drawdown.
+- **Data layer (kept):** `data_ingestion/*` fetchers + `core/data_loader.py` parquet cache — library-agnostic.
 - `vectorbt` is held in reserve for heavy parameter-sweep research; event-driven engines (backtrader /
-  nautilus) are deprioritized — they solve a latency problem we don't have.
+  nautilus) stay deprioritized — they solve a latency problem we don't have.
 
-### Keep / adapt / drop
+## Current state
 
-- **Keep:** `data_ingestion/*` fetchers + `core/data_loader.py` parquet cache (library-agnostic, our most
-  reusable asset); `strategies/base.py` as the authoring interface — reshaped around **target weights**.
-- **Adapt:** `contracts/portfolio.py` → a reporting/comparison view over engine results.
-- **Drop:** `core/backtester.py`, `core/market_data.py`, `executors/backtest.py` (engine replaces them);
-  `analytics/*` + `utils/metrics.py` (use `ffn`/`quantstats`); `strategies/derivatives/*` (out of scope).
+The pipeline runs end-to-end: **data → price panel → strategy weights → `bt` → reports**.
+
+- `core/price_panel.py` — adapts the per-ticker OHLCV dict into a tz-naive close-price panel for `bt`.
+- `strategies/` — `TargetWeightStrategy` interface + registry (`base.py`), with `buy_n_hold` and `momentum`
+  (the latter applies a one-bar `.shift(1)` so signals never look ahead).
+- `engine/runner.py` — builds `bt.Strategy([RunDaily, SelectAll, WeighTarget, Rebalance])` plus a buy-and-hold
+  benchmark; returns the combined `bt` result.
+- `reporting/report.py` — writes CSVs (equity curve, daily returns, `bt` stats, quantstats metrics), PNGs
+  (equity-vs-benchmark, drawdown), and a quantstats HTML tearsheet (distribution, drawdown, alpha/beta, risk).
+- `run.py` — CLI: `python run.py --strategy=momentum --tickers=AAPL --benchmark=SPY --start=… --end=…`.
+- `tests/` — a no-look-ahead test (truncating the future can't change a past weight) and an end-to-end smoke
+  test. Both network-free.
+
+The **entire legacy engine cluster was deleted** (old CLIs, `core/backtester.py`, `market_data.py`,
+`visualizer.py`, `executors/`, `analytics/`, `contracts/`, `guardrails/`, `brokers/`, old `strategies/*`,
+`utils/metrics.py`). `contracts`/`guardrails`/broker will return as clean, purpose-built modules in their
+phases below — not as carried-over dead code.
+
+**Environment:** conda env `options-trading` (pandas ≥ 2.2, `bt`, `quantstats`). The `conda` shell function is
+broken on this machine; invoke the interpreter by absolute path
+(`/Users/rchaks/opt/miniforge3/envs/options-trading/bin/python`).
 
 ## Roadmap
 
-0. **Lock the baseline.** Run the current engine end-to-end on one ticker, record final net worth + stats as
-   the "before" reference any new engine must reproduce.
-1. **Engine spike.** Stand up `bt` on one strategy fed by our data layer; reproduce the baseline curve.
-2. **Strategy + portfolio layer.** Port working strategies to target weights; build the real multi-ticker
-   rebalancing strategy (the current `capm_portfolio` is a stub); make Portfolio the comparison view.
-3. **Trust & tests.** Golden-file tests, accounting-invariant tests, explicit no-look-ahead tests, CI.
-4. **Automated paper trading.** On a schedule: recompute target weights → diff holdings → emit orders via a
-   thin broker port (Alpaca paper first). Reconcile fills against backtest expectations.
-5. **Live paper / hardening.** Promote to live paper; add monitoring, alerting, failure handling.
+- [x] **0. Lock the baseline.** Captured the old engine's behaviour before replacing it.
+- [x] **1. Engine spike.** `bt` stood up on `buy_n_hold`/`momentum` fed by the existing data layer, with reports.
+- [ ] **2. Strategy + portfolio layer.** Build the real multi-ticker rebalancing strategy (cross-sectional
+      target weights, periodic reconstitution) and the **Portfolio comparison view** that runs several
+      strategies and compares their alpha/beta/Sharpe/risk side by side. *(Single-ticker path done; multi-asset
+      + comparison view are the next slice.)*
+- [ ] **3. Trust & tests.** Broaden coverage: per-strategy no-look-ahead tests, return-reproducibility/golden
+      files, and CI. (No-look-ahead + smoke exist; expand as strategies grow.)
+- [ ] **4. Automated paper trading.** On a schedule: recompute target weights → diff holdings → emit orders via
+      a thin broker port (Alpaca paper first). Reconcile fills against backtest expectations.
+- [ ] **5. Live paper / hardening.** Promote to live paper; add monitoring, alerting, failure handling.
+
+## Immediate next steps
+
+1. **Multi-ticker rebalancing strategy** — a cross-sectional target-weight strategy (e.g. momentum/volatility
+   ranking with periodic reconstitution) to deliver on "portfolio as first-class". `momentum` already supports
+   multiple columns; add a strategy that *selects and weights across* tickers.
+2. **Portfolio comparison view** — run N strategies in one pass and emit a combined alpha/beta/Sharpe/drawdown
+   table (lean on `bt`'s multi-backtest `Result` + quantstats), plus an aggregate-risk readout.
+3. **Tighten config** — surface `--cash`, rebalance frequency, and strategy params (e.g. momentum windows)
+   through the CLI/strategy constructors.
 
 ## Feasibility
 
-High. ~2,500 LOC, cleanly layered; the hardest-to-get-right parts (data ingestion + caching) already work and
-are library-agnostic. Adopting `bt` *reduces* surface area. The daily horizon makes paper trading simple —
-"recompute weights on a schedule, diff holdings, send orders" — no live-parity engine required. Main one-time
-cost: learning `bt` and re-expressing strategies as target weights.
+High. The hardest-to-get-right parts (data ingestion + caching) already work and are library-agnostic. Adopting
+`bt` *reduced* surface area. The daily horizon keeps paper trading simple — "recompute weights on a schedule,
+diff holdings, send orders" — no live-parity engine required.

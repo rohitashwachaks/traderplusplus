@@ -40,10 +40,10 @@ Trader++ isn’t just another backtesting tool. It’s a full-fledged quant trad
 
 ## 🏆 MVP Roadmap
 
-### 1. Unified Execution Engine
-- Common interface: `BacktestExecutor`, `PaperExecutor`, `LiveExecutor`
-- Live broker integration (Alpaca, IBKR, TD Ameritrade)
-- Real-time slippage, partial fills, latency simulation
+### 1. From backtest to paper/live
+- Backtests run on `bt`; the same target-weight strategies drive trading
+- Automated paper trading: recompute weights on a schedule → diff holdings → orders via a thin broker port
+- Broker-agnostic (Alpaca paper first, IBKR swappable), then live paper
 
 ### 2. Advanced Strategy Framework
 - YAML/DSL config loader for no-code strategies
@@ -123,72 +123,55 @@ Built for robust experimentation and real-world readiness, with proper portfolio
 
 ```mermaid
 flowchart TD
-    subgraph Data Layer
-      A[MarketData]
-    end
-    subgraph Strategy Layer
-      B[StrategyBase]
-    end
-    subgraph Execution Layer
-      C[PortfolioExecutor]
-      D[Guardrails]
-    end
-    subgraph Portfolio & Analytics
-      E[Portfolio]
-      F[Performance Analytics]
-    end
-    A -- Price/Volume Data --> B
-    B -- Signals --> C
-    C -- Orders/Trades --> E
-    C -- Risk Checks --> D
-    D -- Approve/Block Trades --> C
-    E -- Holdings/PnL --> F
-    F -- Reports --> E
+    A[DataIngestionManager<br/>Yahoo / Polygon / Alpaca + parquet cache]
+    B[to_price_panel<br/>tz-naive close panel]
+    C[TargetWeightStrategy<br/>prices → target weights]
+    D[bt engine<br/>WeighTarget + Rebalance, vs benchmark]
+    E[reporting<br/>CSVs, plots, quantstats tearsheet]
+    A -- OHLCV --> B
+    B -- price panel --> C
+    C -- weights --> D
+    D -- result --> E
 ```
 
 ---
 
 ## 🏗️ Project Structure & Architecture
 
-- `contracts/` — Core contracts and abstract base classes (Portfolio, StrategyBase, Executor)
-- `core/` — Core logic, execution engines, simulation loop
-- `strategies/` — Example and user strategies (momentum, buy & hold, etc.)
-- `data_ingestion/`, `data_cache/` — Data loaders, adapters, and caching for reproducible research
-- `analytics/`, `ml_engine/` — Analytics, reporting, and ML integrations
-- `dashboard/` — Streamlit/Dash dashboard for visualization
-- `run_backtest.py` — CLI entry point to run backtests
-- `main.py`, `run/` — Additional CLI tools and runners
+The engine runs on [`bt`](https://pmorissette.github.io/bt/); metrics come from `ffn` + `quantstats`. The
+pipeline is **data → price panel → strategy weights → `bt` → reports**. See `docs/00-direction.md` for the
+current state and roadmap.
+
+- `data_ingestion/`, `data_cache/` — provider fetchers (Yahoo, Polygon, Alpaca) + parquet cache
+- `core/data_loader.py`, `core/price_panel.py` — data ingestion/caching and the `bt` price panel adapter
+- `strategies/` — `TargetWeightStrategy` interface + registry (`base.py`), `buy_n_hold.py`, `momentum.py`
+- `engine/runner.py` — builds and runs the `bt` backtest (+ benchmark)
+- `reporting/report.py` — CSVs, PNG plots, and the quantstats HTML tearsheet
+- `run.py` — CLI entry point
+- `tests/` — no-look-ahead + smoke tests
 
 ---
 
 ## 🚦 Development Roadmap (Next Steps)
 
-1. **Finalize Core Contracts**
-   - Audit and refine `Portfolio`, `StrategyBase`, and `PortfolioExecutor` for strict modularity and safety (no future leaks).
-2. **Strategy API**
-   - Enforce and document the `generate_signals` interface. Add more example strategies.
-3. **Backtesting Engine**
-   - Expand test coverage and logging in `run_backtest.py` and `core/executors/backtest.py`.
-4. **Data Layer**
-   - Ensure robust, reproducible data ingestion and caching. Document data contracts.
-5. **CLI & Developer Experience**
-   - Improve CLI usability and add clear usage examples.
-6. **Dashboard & Analytics**
-   - Expand analytics and dashboard integration for portfolio and strategy reporting.
-7. **Documentation**
-   - Add docstrings, inline docs, and contribution guidelines for new modules and strategies.
+The single source of truth for current state and roadmap is **`docs/00-direction.md`**. In short, next up:
+
+1. **Multi-ticker rebalancing strategy** — cross-sectional target weights with periodic reconstitution.
+2. **Portfolio comparison view** — run several strategies and compare alpha/beta/Sharpe/drawdown/risk.
+3. **Automated paper trading** — recompute weights on a schedule → diff holdings → orders via a thin broker
+   port (Alpaca paper first), then live paper.
 
 ---
 
 ## 🔧 Core Components
 
-| Module            | Purpose                                                                 |
-|-------------------|-------------------------------------------------------------------------|
-| Portfolio         | Tracks assets, cash, trades, and strategy metadata. Self-contained unit. |
-| PortfolioExecutor | Orchestrates strategy execution, manages trade logic, evaluates guards.  |
-| MarketData        | Historical price data & sliding window views for strategies.             |
-| StrategyBase      | Interface for strategy design, single/multi-asset support.               |
-| Backtester        | Runs simulations, exports performance reports and logs.                  |
+| Module                  | Purpose                                                                  |
+|-------------------------|--------------------------------------------------------------------------|
+| `DataIngestionManager`  | Fetches OHLCV from Yahoo/Polygon/Alpaca with a parquet cache.            |
+| `to_price_panel`        | Turns per-ticker OHLCV into a tz-naive close-price panel for `bt`.       |
+| `TargetWeightStrategy`  | Authoring interface: maps a price panel to target weights (no look-ahead).|
+| `engine.runner.run`     | Runs the strategy + benchmark on `bt`.                                    |
+| `reporting.write_reports` | Writes CSVs, plots, and the quantstats tearsheet (alpha/beta/Sharpe/risk).|
 
 ---
 
@@ -212,15 +195,15 @@ flowchart TD
    ```
 2. **Run a Backtest**
    ```bash
-   python main.py --start=2022-05-29 --end=2025-05-29 --cash 50000 --plot --export --tickers=META --refresh --strategy=momentum --benchmark=META --guardrail=trailing_stop_loss
+   python run.py --strategy=momentum --tickers=AAPL --benchmark=SPY --start=2023-01-01 --end=2024-01-01 --out=output/momentum
    ```
+   Reports land in the `--out` directory: `equity_curve.csv`, `daily_returns.csv`, `stats.csv`,
+   `metrics.csv`, `equity_vs_benchmark.png`, `drawdown.png`, and `tearsheet.html`.
 3. **Add a New Strategy**
-   - Implement a new class in `strategies/` inheriting from `StrategyBase` and implementing `generate_signals()`.
-   - Register your strategy by importing it in `strategies/__init__.py`.
-
-4  **Add a New Guardrail**
-   - Implement a new class in `guardrails/` inheriting from `GuardrailBase` and implementing `evaluate()`.
-   - Register your guardrail by importing it in `guardrails/__init__.py`.
+   - Add a class in `strategies/` subclassing `TargetWeightStrategy` and implementing
+     `weights(prices) -> DataFrame` (target weights per ticker; apply any signal lag inside to avoid look-ahead).
+   - Decorate it with `@register("your_name")` and import it from `strategies/__init__.py`.
+   - Ship it with a no-look-ahead test in `tests/`.
 ---
 
 ## 🤝 Contributing

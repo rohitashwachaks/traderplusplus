@@ -1,11 +1,3 @@
-
-import pkgutil
-import importlib
-import inspect
-from .base import StrategyFactory, StrategyBase
-
-for loader, module_name, is_pkg in pkgutil.iter_modules(__path__):
-    module = importlib.import_module(f"{__name__}.{module_name}")
-    for name, obj in inspect.getmembers(module):
-        if inspect.isclass(obj) and issubclass(obj, StrategyBase) and obj is not StrategyBase:
-            StrategyFactory.register_strategy(name, obj)
+"""Importing this package registers all built-in strategies."""
+from strategies import buy_n_hold, momentum  # noqa: F401  (import triggers registration)
+from strategies.base import available, create

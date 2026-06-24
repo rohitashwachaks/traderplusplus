@@ -20,18 +20,17 @@ Constraints that shape every decision:
 - **Trajectory:** research backtest → automated paper trading → live paper trading. Broker stays behind a
   thin, swappable interface (Alpaca paper first; IBKR a later swap).
 
-## Architectural direction (in progress)
+## Architecture (live)
 
-We are **retiring the hand-rolled backtest engine** (`core/backtester.py`, `core/market_data.py`,
-`executors/backtest.py`) and standing on proven libraries:
+The hand-rolled engine is gone. The pipeline is **data → price panel → strategy weights → `bt` → reports**:
 
-- **Engine:** [`bt`](https://pmorissette.github.io/bt/) — rebalancing-first, composable `Algo`s, multi-asset.
+- **Engine:** [`bt`](https://pmorissette.github.io/bt/) — rebalancing-first; `WeighTarget` consumes a strategy's
+  target-weight DataFrame.
 - **Metrics:** `ffn` + `quantstats` — do **not** hand-maintain Sharpe/alpha/beta/drawdown.
-- **Keep:** the data layer (`data_ingestion/*`, `core/data_loader.py` parquet cache) — it's the most
-  reusable asset and is library-agnostic.
-- **Drop:** `strategies/derivatives/*` (out of scope).
+- **Data layer (kept):** `data_ingestion/*` + `core/data_loader.py` parquet cache — library-agnostic.
+- **Out of scope (deleted):** derivatives, live trading — they return in their roadmap phase, not before.
 
-Full reasoning and the migration roadmap live in `docs/00-direction.md`. When in doubt about scope or
+Full reasoning, current state, and the roadmap live in `docs/00-direction.md`. When in doubt about scope or
 direction, that doc wins.
 
 ## Non-negotiables (this is critical infrastructure)
@@ -55,9 +54,7 @@ direction, that doc wins.
 
 You are penalized for every useless line. Write the minimum code that is correct and clear.
 
-- **Delete, don't comment out.** Dead/commented-out code is forbidden (the repo currently has some — e.g.
-  the commented `StrategyFactory.__init__` in `strategies/base.py`; remove such blocks when you touch them).
-  Git is the history.
+- **Delete, don't comment out.** Dead/commented-out code is forbidden. Git is the history.
 - **No debug residue.** No stray `print('here')`, no leftover scratch. Use the logger for real diagnostics.
 - **Small, single-purpose functions.** If a function needs a paragraph to explain, split it.
 - **Type everything** — match existing style: Python 3.10+ unions (`pd.DataFrame | None`), `typing`
@@ -67,38 +64,42 @@ You are penalized for every useless line. Write the minimum code that is correct
 - **Docstrings: Google style, and only when they add information.** Document *why* and non-obvious
   contracts (especially look-ahead guarantees, units, side effects). Don't restate the signature or write
   empty `:param x:` stubs — the repo has these; don't add more.
-- **Names say what they mean.** Match domain vocabulary already in `contracts/` (Asset, Order, Portfolio,
-  weights, rebalance). No abbreviations that aren't already idiomatic here.
-- **One source of truth.** Don't duplicate logic or state. If two places compute net worth or metrics,
-  collapse them. (This is why Portfolio is a *view*, not a parallel ledger.)
-- **Reuse before adding.** Check `utils/`, `contracts/`, and the data layer before writing new helpers.
+- **Names say what they mean.** Match the domain vocabulary in use (weights, rebalance, panel, signal,
+  benchmark). No abbreviations that aren't already idiomatic here.
+- **One source of truth.** Don't duplicate logic or state. Let `bt` own accounting and `ffn`/`quantstats`
+  own metrics; a "Portfolio" is a *reporting view*, never a parallel ledger.
+- **Reuse before adding.** Check `utils/`, `core/`, and the data layer before writing new helpers.
 
 ## Anti-patterns to fix on sight
 
-- Bare `except` that hides failures (`core/backtester.py` loop) → raise or narrow + log.
-- Single-ticker hardcoding `list(positions.keys())[0]` in "portfolio" strategies → support multi-asset.
+- Bare `except` that hides failures → raise, or narrow + log.
+- Single-ticker hardcoding (e.g. `list(positions.keys())[0]`) in portfolio strategies → support multi-asset.
 - Commented-out code blocks → delete.
 - Hand-rolled metrics that duplicate `ffn`/`quantstats` → replace.
-- Any new accounting path that competes with the chosen engine's → fold into the reporting view.
+- Any new accounting path that competes with `bt` → fold into the reporting view.
 
 ## Layout
 
 ```text
-data_ingestion/   provider fetchers (yahoo, polygon, alpaca) — KEEP
-core/data_loader  parquet cache (MD5 key per ticker/range/interval/source) — KEEP
-contracts/        domain types: Portfolio (→ reporting view), Asset, Order, TradeLog
-strategies/       authoring layer → reshape around target weights; single_asset/, multi_asset/
-analytics/        being replaced by ffn/quantstats
-core/backtester   being replaced by bt
+data_ingestion/      provider fetchers (yahoo, polygon, alpaca) — KEEP
+core/data_loader.py  parquet cache (MD5 key per ticker/range/interval/source) — KEEP
+core/price_panel.py  OHLCV dict → tz-naive close panel for bt
+strategies/          base.py (TargetWeightStrategy + registry), buy_n_hold.py, momentum.py
+engine/runner.py     builds & runs the bt backtest (+ benchmark)
+reporting/report.py  CSVs, PNGs, quantstats tearsheet
+run.py               CLI entry point
+tests/               no-look-ahead + smoke (network-free)
 ```
 
 ## Working in this repo
 
-- **Run a current backtest (baseline reference):**
-  `python run_backtest.py --strategy=momentum --tickers=AAPL --start=2023-01-01 --end=2024-01-01`
-- **Secrets:** `.env` (gitignored) holds API keys; read via `utils/config.py`. Never commit keys; never
-  print them. Add new config there, not scattered `os.getenv` calls.
-- **Tests are the credibility gate.** New strategy/accounting logic ships with tests — at minimum a
-  golden-file expectation and a no-look-ahead check. Don't add a strategy without one.
-- **Scope discipline.** Don't rebuild what `bt`/`ffn`/`quantstats` already provide. Don't add live-trading
-  or derivatives code until its phase. Smaller, correct, reviewed beats broad and unverified.
+- **Env:** conda env `options-trading`. The `conda` function is broken here, so call the interpreter by path:
+  `/Users/rchaks/opt/miniforge3/envs/options-trading/bin/python`.
+- **Run a backtest:**
+  `…/python run.py --strategy=momentum --tickers=AAPL --benchmark=SPY --start=2023-01-01 --end=2024-01-01`
+- **Tests:** `…/python -m pytest tests/ -q`.
+- **Secrets:** `.env` (gitignored) holds API keys; read via `utils/config.py`. Never commit or print keys.
+  Add new config there, not scattered `os.getenv` calls.
+- **Tests are the credibility gate.** Every new strategy ships with a no-look-ahead test. Don't add one without.
+- **Scope discipline.** Don't rebuild what `bt`/`ffn`/`quantstats` already provide. Don't add live-trading or
+  derivatives code until its phase. Smaller, correct, reviewed beats broad and unverified.

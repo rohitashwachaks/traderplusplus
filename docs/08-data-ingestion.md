@@ -46,7 +46,7 @@ data = ingestion.get_data(
 ### CLI
 
 ```bash
-python run_backtest.py --source=yahoo --tickers=AAPL
+python run.py --source=yahoo --tickers=AAPL
 ```
 
 **Pros**: Free, global coverage  
@@ -111,7 +111,7 @@ ingestion = DataIngestionManager(force_refresh=True)
 
 **CLI**:
 ```bash
-python run_backtest.py --refresh
+python run.py --refresh
 ```
 
 **Clear Cache**:
