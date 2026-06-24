@@ -27,6 +27,7 @@ dependencies = [
   "pandas>=2.2",
   "numpy>=1.23,<2",
   "matplotlib>=3.4",
+  "plotly>=5.0",
   "yfinance>=0.2.40",
   "requests",
   "python-dotenv",

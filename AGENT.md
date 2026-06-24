@@ -84,11 +84,17 @@ You are penalized for every useless line. Write the minimum code that is correct
 data_ingestion/      provider fetchers (yahoo, polygon, alpaca) — KEEP
 core/data_loader.py  parquet cache (MD5 key per ticker/range/interval/source) — KEEP
 core/price_panel.py  OHLCV dict → tz-naive close panel for bt
-strategies/          base.py (TargetWeightStrategy + registry), buy_n_hold.py, momentum.py
-engine/runner.py     builds & runs the bt backtest (+ benchmark)
+strategies/          base.py (TargetWeightStrategy + registry, rebalance/reconstitution freq), buy_n_hold.py, momentum.py
+guardrails/          base.py (Guardrail + registry), stop_loss.py — risk overlays on weights
+engine/runner.py     builds & runs the bt backtest (+ benchmark), applies guardrails + frequencies
+engine/frequency.py  rebalance Run-algo + reconstitution resampling helpers
 reporting/report.py  CSVs, PNGs, quantstats tearsheet
-run.py               CLI entry point
-tests/               no-look-ahead + smoke (network-free)
+reporting/interactive.py  plotly equity explorer (holdings split on hover, buy/sell markers)
+engine/paper.py      rebalance plan: diff target weights vs broker positions → orders
+brokers/             base.py (Broker port), alpaca.py (paper, REST via requests)
+run.py               backtest CLI entry point
+paper_trade.py       paper-rebalance CLI (preview by default; --execute to submit)
+tests/               no-look-ahead + smoke + guardrail/frequency/paper (network-free)
 ```
 
 ## Working in this repo

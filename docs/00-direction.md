@@ -34,11 +34,16 @@ The pipeline runs end-to-end: **data → price panel → strategy weights → `b
 
 - `core/price_panel.py` — adapts the per-ticker OHLCV dict into a tz-naive close-price panel for `bt`.
 - `strategies/` — `TargetWeightStrategy` interface + registry (`base.py`), with `buy_n_hold` and `momentum`
-  (the latter applies a one-bar `.shift(1)` so signals never look ahead).
-- `engine/runner.py` — builds `bt.Strategy([RunDaily, SelectAll, WeighTarget, Rebalance])` plus a buy-and-hold
+  (the latter applies a one-bar `.shift(1)` so signals never look ahead). Each strategy carries a
+  `rebalance_freq` and `reconstitution_freq` (default daily) — see `engine/frequency.py`.
+- `guardrails/` — `Guardrail` interface + registry (`base.py`); `stop_loss.py` is a configurable
+  trailing/fixed stop that overlays the weights (daily close-to-close, no look-ahead, exits to cash).
+- `engine/runner.py` — applies guardrails, reconstitution sampling and the rebalance Run-algo to the strategy
+  weights, then builds `bt.Strategy([Run<freq>, SelectAll, WeighTarget, Rebalance])` plus a buy-and-hold
   benchmark; returns the combined `bt` result.
-- `reporting/report.py` — writes CSVs (equity curve, daily returns, `bt` stats, quantstats metrics), PNGs
-  (equity-vs-benchmark, drawdown), and a quantstats HTML tearsheet (distribution, drawdown, alpha/beta, risk).
+- `reporting/` — `report.py` writes CSVs (equity curve, daily returns, `bt` stats, quantstats metrics), PNGs,
+  and a quantstats tearsheet; `interactive.py` writes a plotly equity explorer (underlying prices, buy/sell
+  markers, per-day portfolio split on hover). Flat/all-cash curves skip the regression metrics with a warning.
 - `run.py` — CLI: `python run.py --strategy=momentum --tickers=AAPL --benchmark=SPY --start=… --end=…`.
 - `tests/` — a no-look-ahead test (truncating the future can't change a past weight) and an end-to-end smoke
   test. Both network-free.
@@ -60,10 +65,13 @@ broken on this machine; invoke the interpreter by absolute path
       target weights, periodic reconstitution) and the **Portfolio comparison view** that runs several
       strategies and compares their alpha/beta/Sharpe/risk side by side. *(Single-ticker path done; multi-asset
       + comparison view are the next slice.)*
-- [ ] **3. Trust & tests.** Broaden coverage: per-strategy no-look-ahead tests, return-reproducibility/golden
-      files, and CI. (No-look-ahead + smoke exist; expand as strategies grow.)
-- [ ] **4. Automated paper trading.** On a schedule: recompute target weights → diff holdings → emit orders via
-      a thin broker port (Alpaca paper first). Reconcile fills against backtest expectations.
+- [~] **3. Trust, tests & risk.** No-look-ahead + smoke tests exist; a configurable stop-loss guardrail
+      (trailing/fixed) is in and tested. Still to do: return-reproducibility/golden files, more guardrails
+      (max-drawdown, position caps), and CI.
+- [~] **4. Automated paper trading.** `paper_trade.py` recomputes the current target weights (same strategy/
+      guardrail/frequency config), diffs them against live Alpaca **paper** positions via a thin broker port
+      (`brokers/`), and previews the orders; `--execute` submits them. Still to do: scheduling, fill
+      reconciliation against backtest expectations.
 - [ ] **5. Live paper / hardening.** Promote to live paper; add monitoring, alerting, failure handling.
 
 ## Immediate next steps

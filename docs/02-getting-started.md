@@ -21,6 +21,21 @@ python run.py --strategy=momentum --tickers=AAPL --benchmark=SPY --start=2023-01
 Flags: `--strategy` (`buy_n_hold` | `momentum`), `--tickers` (comma-separated), `--benchmark`, `--start`,
 `--end`, `--cash`, `--source` (`yahoo` | `polygon` | `alpaca`), `--interval`, `--out`.
 
+**Rebalance / reconstitution (optional):** `--rebalance` and `--reconstitute` take `D|W|M|Q|Y` and override the
+strategy's defaults (both daily = trade whenever the signal changes). `--rebalance Q` trades back to target
+quarterly; `--reconstitute Y` recomputes the target (selection + weights) yearly and holds it constant in
+between. A strategy can also set these as class attributes (`rebalance_freq`, `reconstitution_freq`).
+
+**Risk guardrail (optional):** add `--stop-loss 0.05` for a 5% stop (configurable). It's trailing by default
+(stop measured from the peak since entry); use `--stop-loss-mode fixed` to stop from the entry price instead.
+Because we only have daily bars, a breach is detected on a day's close and the exit lands on the next close —
+no intraday or optimistic stop-price fills. A stopped ticker goes to cash and stays out until the strategy
+re-enters it.
+
+```bash
+python run.py --strategy=momentum --tickers=AAPL --benchmark=SPY --start=2022-01-01 --end=2024-01-01 --stop-loss=0.05
+```
+
 Artifacts written to `--out`:
 
 | File | Contents |
@@ -32,6 +47,7 @@ Artifacts written to `--out`:
 | `equity_vs_benchmark.png` | Rebased equity vs benchmark |
 | `drawdown.png` | Strategy drawdown |
 | `tearsheet.html` | Full quantstats tearsheet (distribution, rolling Sharpe, alpha/beta, risk) |
+| `equity_explorer.html` | Interactive: equity + underlying prices + buy/sell markers; hover shows the portfolio split that day |
 
 ## How it fits together
 
@@ -65,6 +81,23 @@ class MyStrategy(TargetWeightStrategy):
 
 Then import it in `strategies/__init__.py` and ship a no-look-ahead test (see `tests/test_no_lookahead.py`):
 truncating future rows must not change a past weight.
+
+## Paper trading
+
+`paper_trade.py` rebalances an **Alpaca paper** account toward the strategy's *current* target weights — same
+strategy / guardrail / frequency flags as the backtest. It **previews by default** (prints the order plan and
+submits nothing); add `--execute` to actually send the orders.
+
+```bash
+# preview
+python paper_trade.py --strategy=momentum --tickers=AAPL,MSFT --stop-loss=0.05
+# actually submit to Alpaca paper
+python paper_trade.py --strategy=momentum --tickers=AAPL,MSFT --stop-loss=0.05 --execute
+```
+
+It reads `ALPACA_API_KEY` / `ALPACA_API_SECRET` from `.env`, talks to the REST API over `requests` (paper host
+only — asserted), sizes whole-share market orders against your account equity, and sells before buying so
+closing trades fund the openings. To automate, run it on a schedule (cron / `/schedule`) — there's no daemon.
 
 ## Test
 
