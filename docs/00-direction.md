@@ -12,6 +12,8 @@ Constraints that drive every decision:
 - **Horizon:** no intraday/HFT. Holds ~1 day to 6 months → **daily bars**.
 - **Style:** rebalancing / reconstitution — *signal/score → target weights → rebalance*. Future signals may
   come from screeners and AI-agent / news sources, so strategies express **target weights**, not raw orders.
+- **Unit of test:** a *rule over a point-in-time universe*, not a strategy over a hand-picked ticker. A single
+  name is the degenerate N=1 case. See `docs/03-research-platform.md`.
 - **Portfolio = reporting / comparison view:** compare strategies' alpha/beta/Sharpe/drawdown/risk and track
   overall-portfolio risk. Not a second accounting system.
 - **Trajectory:** research backtest → automated paper trading → live paper trading. Broker behind a thin,
@@ -58,13 +60,32 @@ phases below — not as carried-over dead code.
 broken on this machine; invoke the interpreter by absolute path
 (`/Users/rchaks/opt/miniforge3/envs/options-trading/bin/python`).
 
+## The bias reckoning (why no-look-ahead isn't enough)
+
+The engine's `shift(1)` / truncation discipline guards exactly **one** bias — temporal leakage in a price
+signal — and that rigor quietly created a false sense of safety. Three deeper biases went unchallenged and now
+shape the platform's direction:
+
+- **Selection bias** — backtesting a hand-picked surviving ticker (momentum on AAPL / Home Depot) proves
+  nothing; the *choice of ticker* is the cheat. Validate rules cross-sectionally over a whole universe.
+- **Survivorship bias** — backtesting the past on *today's* index members deletes the delisted losers.
+- **Point-in-time fundamentals** — a P/E strategy needs the P/E that was *public* on each past date (filing
+  date), not today's snapshot.
+
+The fix is the **universe-first, point-in-time research platform** in `docs/03-research-platform.md`: a
+`DataContext` keystone, EDGAR as the single point-in-time fundamentals/SIC source, a (initially labeled
+survivorship-biased) universe, and bias-stamped reports. The methodology rule this taught is now `AGENT.md`
+non-negotiable 6 ("a backtest must be valid as an experiment, not just as code").
+
 ## Roadmap
 
 - [x] **0. Lock the baseline.** Captured the old engine's behaviour before replacing it.
 - [x] **1. Engine spike.** `bt` stood up on `buy_n_hold`/`momentum` fed by the existing data layer, with reports.
-- [~] **2. Strategy + portfolio layer.** `xs_momentum` delivers the real multi-ticker, cross-sectional,
-      periodically-reconstituted strategy. Still to do: the **Portfolio comparison view** that runs several
-      strategies and compares their alpha/beta/Sharpe/risk side by side.
+- [~] **2. Strategy + research platform.** `xs_momentum` delivers the real multi-ticker, cross-sectional,
+      periodically-reconstituted strategy. The rest of this phase is now the **universe-first, point-in-time
+      research platform** (`docs/03-research-platform.md`, phases A–E): the `weights(ctx)` migration, a
+      labeled-biased S&P 500 universe, EDGAR point-in-time fundamentals, and the research/compare-sweep bed
+      (which subsumes the old "Portfolio comparison view").
 - [~] **3. Trust, tests & risk.** No-look-ahead + smoke tests exist; a configurable stop-loss guardrail
       (trailing/fixed) is in and tested. Still to do: return-reproducibility/golden files, more guardrails
       (max-drawdown, position caps), and CI.
@@ -76,13 +97,15 @@ broken on this machine; invoke the interpreter by absolute path
 
 ## Immediate next steps
 
-1. **Multi-ticker rebalancing strategy** — a cross-sectional target-weight strategy (e.g. momentum/volatility
-   ranking with periodic reconstitution) to deliver on "portfolio as first-class". `momentum` already supports
-   multiple columns; add a strategy that *selects and weights across* tickers.
-2. **Portfolio comparison view** — run N strategies in one pass and emit a combined alpha/beta/Sharpe/drawdown
-   table (lean on `bt`'s multi-backtest `Result` + quantstats), plus an aggregate-risk readout.
-3. **Tighten config** — surface `--cash`, rebalance frequency, and strategy params (e.g. momentum windows)
-   through the CLI/strategy constructors.
+Driven by `docs/03-research-platform.md` (phase letters below):
+
+1. **Phase A — `weights(ctx)` migration.** Introduce the `DataContext` keystone and migrate the existing
+   strategies onto it (price-only context, `members` all-`True`). Behavior-preserving; existing tests stay green.
+2. **Phase B — universe + research bed (price only).** Labeled-biased S&P 500 universe so momentum / xs_momentum
+   are tested cross-sectionally (the selection-bias fix), plus the compare/sweep research bed with bias-stamped
+   reports (subsumes the old "Portfolio comparison view").
+3. **Phase C — EDGAR point-in-time fundamentals.** The PIT store + `ctx.fundamental("pe")` + the `ls_pe`
+   long/short strategy + a fundamentals no-look-ahead test — the first trustworthy fundamental backtest.
 
 ## Feasibility
 

@@ -9,6 +9,9 @@ pip install -r requirements.txt   # or: pip install -e .
 Core stack: `bt` (engine), `ffn` + `quantstats` (metrics), `yfinance` (data). Requires Python ≥ 3.10 and
 pandas ≥ 2.2.
 
+Where this is heading: a universe-first, point-in-time research platform (cross-sectional backtests,
+EDGAR fundamentals, screener = a strategy's latest row). See `docs/03-research-platform.md`.
+
 > On this machine the conda env is `options-trading` and the `conda` shell function is broken, so call the
 > interpreter by path: `/Users/rchaks/opt/miniforge3/envs/options-trading/bin/python`.
 

@@ -30,6 +30,12 @@ The hand-rolled engine is gone. The pipeline is **data → price panel → strat
 - **Data layer (kept):** `data_ingestion/*` + `core/data_loader.py` parquet cache — library-agnostic.
 - **Out of scope (deleted):** derivatives, live trading — they return in their roadmap phase, not before.
 
+**Direction (in progress):** the platform is moving to **universe-first, point-in-time** research
+(`docs/03-research-platform.md`). The strategy input migrates from `weights(prices)` to **`weights(ctx)`** (a
+`DataContext` of price · membership · classification · point-in-time fundamentals); **EDGAR is the single
+fundamentals/SIC source** (one source of truth — no yfinance fundamentals); the universe starts labeled
+survivorship-biased and upgrades through the same seam. `bt` stays the engine, swappable behind `engine/runner`.
+
 Full reasoning, current state, and the roadmap live in `docs/00-direction.md`. When in doubt about scope or
 direction, that doc wins.
 
@@ -49,6 +55,21 @@ direction, that doc wins.
    range and data source so a result can be re-derived.
 5. **Correctness over cleverness.** Prefer the boring, obviously-correct implementation. If a clever
    vectorized trick risks look-ahead or obscures intent, don't.
+6. **A backtest must be valid as an *experiment*, not just as code.** Line-level no-look-ahead (#1) is
+   necessary, not sufficient. Before trusting a result, account for the biases that make a clean-running
+   backtest still a lie:
+   - **Selection bias** — a hand-picked ticker is a cherry-pick; validate rules *cross-sectionally over the
+     whole universe*, never on one name you already know won.
+   - **Survivorship bias** — test over the universe *as it existed then* (delisted names included), not today's
+     survivors.
+   - **Point-in-time data** — fundamentals / alt-data keyed to when they became *public* (filing date),
+     as-first-filed, never the period they describe or a later restatement.
+   - **Overfitting / data-snooping** — params tuned on the test window prove nothing; keep out-of-sample
+     discipline and prefer few, defensible knobs.
+   - **Costs & frictions** — frictionless shorts / turnover flatter returns; name what isn't modeled.
+
+   Every report must **stamp the biases it still carries**. A labeled-approximate backtest is honest; an
+   unlabeled one is the cardinal sin. The platform that operationalizes this is `docs/03-research-platform.md`.
 
 ## Code hygiene — every line must earn its place
 
@@ -95,6 +116,17 @@ brokers/             base.py (Broker port), alpaca.py (paper, REST via requests)
 run.py               backtest CLI entry point
 paper_trade.py       paper-rebalance CLI (preview by default; --execute to submit)
 tests/               no-look-ahead + smoke + guardrail/frequency/paper (network-free)
+```
+
+Planned for the universe-first / point-in-time platform (not yet built — see `docs/03-research-platform.md`):
+
+```text
+core/context.py          DataContext: price · members · meta · fundamental(name) — strategy input
+core/universe.py         S&P 500 membership mask (labeled survivorship-biased to start)
+core/fundamentals.py     EDGAR point-in-time fundamentals store (as-first-filed)
+data_ingestion/edgar_fetcher.py  SEC XBRL companyfacts/frames + submissions (SIC)
+research/lab.py          compare() + sweep() over many configs in one bt.run
+research/report.py       bias-stamped comparison table + overlaid explorer + sweep heatmap
 ```
 
 ## Working in this repo
