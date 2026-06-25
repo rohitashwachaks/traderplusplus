@@ -52,6 +52,7 @@ class TargetWeightStrategy(ABC):
     rebalance_freq: str = "D"
     reconstitution_freq: str = "D"
     single_asset: bool = False
+    requires: tuple[str, ...] = ()  # context panels beyond price/members, e.g. ("eps",)
 
     @abstractmethod
     def weights(self, ctx: DataContext) -> pd.DataFrame:

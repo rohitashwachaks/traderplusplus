@@ -163,8 +163,12 @@ and EDGAR `frames` pulls a whole concept across all filers per quarter.
   `data/sp500.csv`) + the single-asset **universe sweep** with the alpha/beta distribution report ship the
   Home-Depot selection-bias fix for `momentum`. Still to do: the multi-strategy `compare`/param-sweep and
   CAPM rolling beta as a derived feature.
-- **C — EDGAR point-in-time fundamentals. [deferred — next]** `edgar_fetcher` + `core/fundamentals.py`; `ctx.fundamental("pe")`;
-  the `ls_pe` strategy; a fundamentals no-look-ahead test. First trustworthy fundamental backtest.
+- **C — EDGAR point-in-time fundamentals. [v1 done]** `data_ingestion/edgar_fetcher.py` (CIK map + cached
+  companyconcept) + `core/fundamentals.py` (annual diluted EPS, **as-first-filed**, exposed as the `eps`
+  panel); strategies declare `requires=("eps",)`; `build_context` forward-fills it point-in-time onto the
+  calendar; the dollar-neutral `ls_pe` long/short ships with an as-first-filed + PIT no-look-ahead test. First
+  trustworthy fundamental backtest. Next EDGAR steps: **TTM** EPS (vs annual), market-cap (shares × price) and
+  SIC for the volatility/comparables screens.
 - **D — Survivorship upgrade.** Historical membership into `members` + delisting / last-price handling. Removes
   the labeled bias through the same pipeline.
 - **E — Risk / volatility layer.** With metrics finally trustworthy: volatility targeting, position caps, more

@@ -109,7 +109,14 @@ def build_context(
 
     calendar = price.index
     columns = list(price.columns)
-    aligned = {name: panel.reindex(calendar, columns=columns) for name, panel in loaded.items()}
+    aligned = {"price": price}
+    for name, panel in loaded.items():
+        if name == "price":
+            continue
+        # Point-in-time alignment: forward-fill each feature from its filing/availability date
+        # onto the trading calendar. ffill only ever reaches back, so this stays no-look-ahead.
+        idx = calendar.union(panel.index)
+        aligned[name] = panel.reindex(index=idx, columns=columns).ffill().reindex(calendar)
     aligned["members"] = universe.membership(calendar, columns) & price.notna()
     meta = universe.meta().reindex(columns)
     return DataContext(panels=aligned, meta=meta)

@@ -21,10 +21,12 @@ EDGAR fundamentals, screener = a strategy's latest row). See `docs/03-research-p
 python run.py --strategy=momentum --tickers=AAPL --benchmark=SPY --start=2023-01-01 --end=2024-01-01 --out=output/momentum
 ```
 
-Flags: `--strategy` (`buy_n_hold` | `momentum` | `xs_momentum`), `--tickers` (comma-separated) **or**
-`--universe sp500`, `--benchmark`, `--start`, `--end`, `--cash`, `--source` (`yahoo` | `polygon` | `alpaca`),
-`--interval`, `--out`. `xs_momentum` is cross-sectional momentum: rank a basket by trailing return, hold the
-top names equal-weighted, reconstituted monthly — give it several tickers.
+Flags: `--strategy` (`buy_n_hold` | `momentum` | `xs_momentum` | `ls_pe`), `--tickers` (comma-separated) **or**
+`--universe sp500` (with `--limit N` for quick runs), `--benchmark`, `--start`, `--end`, `--cash`, `--source`
+(`yahoo` | `polygon` | `alpaca`), `--interval`, `--out`. `xs_momentum` is cross-sectional momentum (rank a
+basket by trailing return, hold the top names equal-weighted, monthly). `ls_pe` is a dollar-neutral long/short
+on **point-in-time P/E** (long cheapest, short richest) — it pulls annual EPS from SEC EDGAR, keyed to filing
+date, so give it a universe (e.g. `--universe sp500 --limit 50`).
 
 ## Sweep a single-asset rule across a universe
 

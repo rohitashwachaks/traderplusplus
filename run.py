@@ -75,9 +75,11 @@ def main():
     if universe.stamp():
         log.warning("BIAS: %s", universe.stamp())
 
-    log.info("Loading %d names + benchmark %s (%s to %s)",
-             len(universe.tickers()), benchmark, args.start, args.end)
-    ctx = build_context(universe, args.start, args.end, source=args.source, interval=args.interval)
+    panels = ("price",) + tuple(strategy.requires)
+    log.info("Loading %d names + benchmark %s (%s to %s); panels=%s",
+             len(universe.tickers()), benchmark, args.start, args.end, panels)
+    ctx = build_context(universe, args.start, args.end, panels=panels,
+                        source=args.source, interval=args.interval)
     benchmark_prices = _load_panel(
         DataIngestionManager(source=args.source), [benchmark], args.start, args.end, args.interval)
 

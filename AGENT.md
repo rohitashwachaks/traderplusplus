@@ -105,11 +105,13 @@ You are penalized for every useless line. Write the minimum code that is correct
 data_ingestion/      provider fetchers (yahoo, polygon, alpaca) — KEEP
 core/data_loader.py  parquet cache (MD5 key per ticker/range/interval/source) — KEEP
 core/price_panel.py  OHLCV dict → tz-naive close panel for bt
-core/sources.py      PanelSource registry (price now; EDGAR later) — pluggable data behind the context
-core/context.py      DataContext: price · members · meta · fundamental(name) — the single strategy input
+core/sources.py      PanelSource registry (price, eps) — pluggable data behind the context
+core/context.py      DataContext: price · members · meta · fundamental(name) — the single strategy input; build_context outer-joins + ffills feature panels (point-in-time)
 core/universe.py     Universe (ListUniverse, SP500 from data/sp500.csv) + point-in-time membership mask
+core/fundamentals.py annual_eps_series (as-first-filed) + EpsSource (point-in-time EPS panel)
+data_ingestion/edgar_fetcher.py  SEC EDGAR: ticker→CIK map + cached companyconcept facts (filed dates)
 data/sp500.csv       pasted S&P 500 constituents (Symbol[, GICS Sector, GICS Sub-Industry]) — committed input
-strategies/          base.py (TargetWeightStrategy + registry, freq, single_asset), buy_n_hold.py, momentum.py (single-asset), cross_sectional_momentum.py
+strategies/          base.py (TargetWeightStrategy + registry, freq, single_asset, requires), buy_n_hold.py, momentum.py (single-asset), cross_sectional_momentum.py, long_short_pe.py (ls_pe, requires eps)
 guardrails/          base.py (Guardrail + registry), stop_loss.py — risk overlays on weights
 research/            sweep.py (single-asset rule across a universe → per-name alpha/beta), report.py (distribution chart)
 engine/runner.py     builds & runs the bt backtest (+ benchmark), applies guardrails + frequencies
@@ -125,15 +127,13 @@ tests/               no-look-ahead + smoke + guardrail/frequency/paper + data-la
 ```
 
 Strategies receive a `DataContext` (`weights(ctx)`), never a raw price frame, and only hold names where
-`ctx.members` is true. A *single-asset* strategy (e.g. `momentum`) is validated by **sweeping** it across a
-universe one name at a time and reading the distribution of alpha/beta — not by pooling names into a basket.
+`ctx.members` is true. A strategy declares any non-price data it needs via `requires` (e.g. `ls_pe` sets
+`requires = ("eps",)`); `build_context` loads those panels and forward-fills them point-in-time onto the
+trading calendar. A *single-asset* strategy (e.g. `momentum`) is validated by **sweeping** it across a universe
+one name at a time and reading the distribution of alpha/beta — not by pooling names into a basket.
 
-Planned next (not yet built — see `docs/03-research-platform.md`, Phase C):
-
-```text
-core/fundamentals.py             EDGAR point-in-time fundamentals store (as-first-filed)
-data_ingestion/edgar_fetcher.py  SEC XBRL companyfacts/frames + submissions (SIC)
-```
+Point-in-time fundamentals come **only** from SEC EDGAR (each value keyed to its `filed` date,
+as-first-filed). EPS lands now; market-cap / sector (SIC) and TTM EPS are the next EDGAR additions.
 
 ## Working in this repo
 
