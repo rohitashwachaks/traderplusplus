@@ -64,3 +64,35 @@ def test_sp500_reads_pasted_csv(tmp_path):
 def test_sp500_missing_file_raises_clearly():
     with pytest.raises(RuntimeError, match="snapshot not found"):
         SP500(path="/no/such/sp500.csv").tickers()
+
+
+def test_to_price_panel_outer_keeps_union_with_nan():
+    from core.price_panel import to_price_panel
+    dates = pd.date_range("2020-01-01", periods=5, freq="B", tz="UTC")
+
+    def d(vals):
+        return pd.DataFrame({"Close": vals}, index=dates)
+
+    panel = to_price_panel({"A": d([1, 2, 3, 4, 5.0]), "B": d([np.nan, np.nan, 3, 4, 5.0])}, how="outer")
+    assert len(panel) == 5                         # union of dates, nothing dropped
+    assert panel["B"].isna().sum() == 2            # B's pre-listing gap preserved as NaN
+
+
+def test_build_context_membership_is_tradable_mask(monkeypatch):
+    dates = pd.date_range("2020-01-01", periods=5, freq="B")
+    price = pd.DataFrame(
+        {"A": [1, 2, 3, 4, 5.0], "B": [np.nan, np.nan, 3, 4, 5.0], "DEAD": [np.nan] * 5},
+        index=dates,
+    )
+
+    class FakeSource:
+        def load(self, tickers, start, end, **opts):
+            return price[list(tickers)]
+
+    monkeypatch.setattr("core.context._sources.get_source", lambda name: FakeSource())
+    ctx = build_context(ListUniverse(["A", "B", "DEAD"]), "2020-01-01", "2020-02-01")
+
+    assert "DEAD" not in ctx.price.columns         # all-NaN name dropped (logged)
+    assert ctx.members["A"].all()
+    assert not ctx.members["B"].iloc[0]            # B not tradable before it has a price
+    assert ctx.members["B"].iloc[-1]               # tradable once data appears

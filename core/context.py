@@ -5,11 +5,14 @@ and any feature like ``"pe"``) plus a static per-ticker ``meta`` table. Strategi
 everything through this one object and never learn where a panel came from, so new data
 sources (see :mod:`core.sources`) can be added or swapped without touching any strategy.
 """
+import logging
 from dataclasses import dataclass
 
 import pandas as pd
 
 from core import sources as _sources
+
+log = logging.getLogger("traderplusplus")
 
 
 @dataclass(frozen=True)
@@ -68,29 +71,45 @@ def build_context(
     end: str,
     *,
     panels: tuple[str, ...] = ("price",),
+    join: str = "outer",
     **opts,
 ) -> DataContext:
     """Assemble a :class:`DataContext` for ``universe`` over ``[start, end]``.
 
     Each requested panel is pulled from its registered source (:mod:`core.sources`), reindexed
-    onto the price calendar, and bundled with the universe's membership mask and ``meta``.
-    ``"price"`` must be among ``panels`` — it defines the trading calendar everything aligns to.
+    onto the price calendar, and bundled with a membership mask and ``meta``. ``"price"`` must
+    be among ``panels`` — it sets the trading calendar everything aligns to.
+
+    Prices are outer-joined (``join="outer"``) so a universe with staggered listing/delisting
+    histories keeps every name; columns with no data at all are dropped (logged). The
+    membership mask is the universe's own membership **and** ``price.notna()`` — so a name is
+    only ever held on dates it actually traded. That keeps the backtest honest: no holding a
+    stock before it listed or after it delisted, even while the labeled-biased universe assumes
+    today's members throughout.
 
     Args:
         universe: a :class:`~core.universe.Universe` (provides tickers, membership, meta).
         start, end: date window (YYYY-MM-DD).
         panels: panel names to load; ``"price"`` is required and always the calendar.
+        join: price alignment across names — ``"outer"`` (universe-safe) or ``"inner"``.
         **opts: source-specific options (e.g. ``source="yahoo"``, ``interval="1d"``).
     """
     if "price" not in panels:
         raise ValueError("build_context requires the 'price' panel (it sets the calendar)")
 
     tickers = universe.tickers()
-    loaded = {name: _sources.get_source(name).load(tickers, start, end, **opts) for name in panels}
+    loaded = {name: _sources.get_source(name).load(tickers, start, end, how=join, **opts) for name in panels}
 
-    calendar = loaded["price"].index
-    columns = list(loaded["price"].columns)
-    aligned = {name: panel.reindex(calendar) for name, panel in loaded.items()}
-    aligned["members"] = universe.membership(calendar, columns)
+    price = loaded["price"]
+    empty = price.columns[price.isna().all()]
+    if len(empty):
+        log.warning("dropping %d names with no price data: %s", len(empty), list(empty))
+        price = price.drop(columns=empty)
+        loaded["price"] = price
+
+    calendar = price.index
+    columns = list(price.columns)
+    aligned = {name: panel.reindex(calendar, columns=columns) for name, panel in loaded.items()}
+    aligned["members"] = universe.membership(calendar, columns) & price.notna()
     meta = universe.meta().reindex(columns)
     return DataContext(panels=aligned, meta=meta)

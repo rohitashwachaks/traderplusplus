@@ -24,6 +24,8 @@ def parse_args():
     p.add_argument("--tickers", default="AAPL", help="Comma-separated tickers, e.g. AAPL,MSFT")
     p.add_argument("--universe", default=None, choices=available_universes(),
                    help="Trade a named universe (e.g. sp500) instead of --tickers")
+    p.add_argument("--limit", type=int, default=None,
+                   help="With --universe, use only the first N names (quick runs)")
     p.add_argument("--benchmark", default="SPY", help="Benchmark ticker")
     p.add_argument("--start", default="2023-01-01", help="Start date (YYYY-MM-DD)")
     p.add_argument("--end", default=datetime.now().strftime("%Y-%m-%d"), help="End date (YYYY-MM-DD)")
@@ -58,7 +60,7 @@ def main():
     benchmark = clean_ticker(args.benchmark)
 
     if args.universe:
-        universe = create_universe(args.universe)
+        universe = create_universe(args.universe, limit=args.limit) if args.limit else create_universe(args.universe)
     else:
         universe = ListUniverse(args.tickers.split(","))
 

@@ -55,10 +55,11 @@ class PriceSource(PanelSource):
     def load(self, tickers: list[str], start: str, end: str, **opts) -> pd.DataFrame:
         source = opts.get("source", "yahoo")
         interval = opts.get("interval", "1d")
+        how = opts.get("how", "inner")
         data = DataIngestionManager(source=source).get_data(
             tickers, end_date=end, start_date=start, interval=interval
         )
-        return to_price_panel(data)
+        return to_price_panel(data, how=how)
 
 
 register_source(PriceSource())

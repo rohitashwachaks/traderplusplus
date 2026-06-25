@@ -54,12 +54,16 @@ def run(
     weights = target_weights(strategy, ctx, guardrails)
     weights = weights.reindex(prices.index).ffill().fillna(0.0)
 
+    # bt needs a NaN-free panel. Names not yet listed / delisted carry a 0 weight (the context's
+    # membership mask is price.notna()), so forward/back-filling their prices never affects NAV.
+    bt_prices = prices.ffill().bfill()
+
     strat = bt.Strategy(
         strategy.name,
         [frequency.run_algo(strategy.rebalance_freq), bt.algos.SelectAll(),
          bt.algos.WeighTarget(weights), bt.algos.Rebalance()],
     )
-    strat_test = bt.Backtest(strat, prices, name=strategy.name, initial_capital=initial_capital)
+    strat_test = bt.Backtest(strat, bt_prices, name=strategy.name, initial_capital=initial_capital)
 
     bench_name = benchmark_prices.columns[0]
     bench = bt.Strategy(
