@@ -105,28 +105,34 @@ You are penalized for every useless line. Write the minimum code that is correct
 data_ingestion/      provider fetchers (yahoo, polygon, alpaca) — KEEP
 core/data_loader.py  parquet cache (MD5 key per ticker/range/interval/source) — KEEP
 core/price_panel.py  OHLCV dict → tz-naive close panel for bt
-strategies/          base.py (TargetWeightStrategy + registry, rebalance/reconstitution freq), buy_n_hold.py, momentum.py
+core/sources.py      PanelSource registry (price now; EDGAR later) — pluggable data behind the context
+core/context.py      DataContext: price · members · meta · fundamental(name) — the single strategy input
+core/universe.py     Universe (ListUniverse, SP500 from data/sp500.csv) + point-in-time membership mask
+data/sp500.csv       pasted S&P 500 constituents (Symbol[, GICS Sector, GICS Sub-Industry]) — committed input
+strategies/          base.py (TargetWeightStrategy + registry, freq, single_asset), buy_n_hold.py, momentum.py (single-asset), cross_sectional_momentum.py
 guardrails/          base.py (Guardrail + registry), stop_loss.py — risk overlays on weights
+research/            sweep.py (single-asset rule across a universe → per-name alpha/beta), report.py (distribution chart)
 engine/runner.py     builds & runs the bt backtest (+ benchmark), applies guardrails + frequencies
 engine/frequency.py  rebalance Run-algo + reconstitution resampling helpers
 reporting/report.py  CSVs, PNGs, quantstats tearsheet
 reporting/interactive.py  plotly equity explorer (holdings split on hover, buy/sell markers)
 engine/paper.py      rebalance plan: diff target weights vs broker positions → orders
 brokers/             base.py (Broker port), alpaca.py (paper, REST via requests)
-run.py               backtest CLI entry point
+run.py               backtest CLI entry point (--tickers or --universe; single-asset strategies redirect to sweep)
+sweep.py             universe-sweep CLI: run a single-asset strategy on every name → alpha/beta distribution
 paper_trade.py       paper-rebalance CLI (preview by default; --execute to submit)
-tests/               no-look-ahead + smoke + guardrail/frequency/paper (network-free)
+tests/               no-look-ahead + smoke + guardrail/frequency/paper + data-layer + sweep (network-free)
 ```
 
-Planned for the universe-first / point-in-time platform (not yet built — see `docs/03-research-platform.md`):
+Strategies receive a `DataContext` (`weights(ctx)`), never a raw price frame, and only hold names where
+`ctx.members` is true. A *single-asset* strategy (e.g. `momentum`) is validated by **sweeping** it across a
+universe one name at a time and reading the distribution of alpha/beta — not by pooling names into a basket.
+
+Planned next (not yet built — see `docs/03-research-platform.md`, Phase C):
 
 ```text
-core/context.py          DataContext: price · members · meta · fundamental(name) — strategy input
-core/universe.py         S&P 500 membership mask (labeled survivorship-biased to start)
-core/fundamentals.py     EDGAR point-in-time fundamentals store (as-first-filed)
+core/fundamentals.py             EDGAR point-in-time fundamentals store (as-first-filed)
 data_ingestion/edgar_fetcher.py  SEC XBRL companyfacts/frames + submissions (SIC)
-research/lab.py          compare() + sweep() over many configs in one bt.run
-research/report.py       bias-stamped comparison table + overlaid explorer + sweep heatmap
 ```
 
 ## Working in this repo
@@ -135,6 +141,9 @@ research/report.py       bias-stamped comparison table + overlaid explorer + swe
   `/Users/rchaks/opt/miniforge3/envs/options-trading/bin/python`.
 - **Run a backtest:**
   `…/python run.py --strategy=momentum --tickers=AAPL --benchmark=SPY --start=2023-01-01 --end=2024-01-01`
+- **Sweep a single-asset rule across a universe** (the honest, selection-bias-free way to judge momentum):
+  `…/python sweep.py --strategy=momentum --universe=sp500 --benchmark=SPY --start=2019-01-01 --end=2024-01-01`
+  (paste S&P 500 members into `data/sp500.csv`; `--limit N` for quick runs).
 - **Tests:** `…/python -m pytest tests/ -q`.
 - **Secrets:** `.env` (gitignored) holds API keys; read via `utils/config.py`. Never commit or print keys.
   Add new config there, not scattered `os.getenv` calls.

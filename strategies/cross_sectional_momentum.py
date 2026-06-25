@@ -1,5 +1,6 @@
 import pandas as pd
 
+from core.context import DataContext
 from strategies.base import TargetWeightStrategy, register
 
 
@@ -25,7 +26,8 @@ class CrossSectionalMomentum(TargetWeightStrategy):
         self.lookback = lookback
         self.top_n = top_n
 
-    def weights(self, prices: pd.DataFrame) -> pd.DataFrame:
+    def weights(self, ctx: DataContext) -> pd.DataFrame:
+        prices = ctx.price.where(ctx.members)  # rank only among in-universe names
         momentum = prices.pct_change(self.lookback)
         n = self.top_n or max(1, prices.shape[1] // 2)
 

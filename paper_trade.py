@@ -2,6 +2,7 @@ import argparse
 from datetime import datetime, timedelta
 
 import strategies  # registers built-in strategies
+from core.context import DataContext
 from core.data_loader import DataIngestionManager
 from core.price_panel import to_price_panel
 from engine.paper import build_plan, execute_plan, format_plan
@@ -54,9 +55,10 @@ def main():
 
     ingestion = DataIngestionManager(source=args.source)
     prices = to_price_panel(ingestion.get_data(tickers, end_date=end, start_date=start, interval=args.interval))
+    ctx = DataContext.from_prices(prices)
 
     strategy = _build_strategy(args)
-    weights = target_weights(strategy, prices, _build_guardrails(args)).ffill()
+    weights = target_weights(strategy, ctx, _build_guardrails(args)).ffill()
     target = weights.iloc[-1]
     latest_prices = prices.iloc[-1]
     log.info("Target weights as of %s: %s", prices.index[-1].date(),

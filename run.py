@@ -2,8 +2,12 @@ import argparse
 from datetime import datetime
 
 import strategies  # registers built-in strategies
+from core.context import build_context
 from core.data_loader import DataIngestionManager
 from core.price_panel import to_price_panel
+from core.universe import ListUniverse
+from core.universe import available as available_universes
+from core.universe import create as create_universe
 from engine.runner import run as run_backtest
 from guardrails.stop_loss import StopLoss
 from reporting.report import write_reports
@@ -18,6 +22,8 @@ def parse_args():
     p = argparse.ArgumentParser(description="Backtest a strategy with bt and write reports.")
     p.add_argument("--strategy", default="momentum", choices=available(), help="Strategy name")
     p.add_argument("--tickers", default="AAPL", help="Comma-separated tickers, e.g. AAPL,MSFT")
+    p.add_argument("--universe", default=None, choices=available_universes(),
+                   help="Trade a named universe (e.g. sp500) instead of --tickers")
     p.add_argument("--benchmark", default="SPY", help="Benchmark ticker")
     p.add_argument("--start", default="2023-01-01", help="Start date (YYYY-MM-DD)")
     p.add_argument("--end", default=datetime.now().strftime("%Y-%m-%d"), help="End date (YYYY-MM-DD)")
@@ -49,15 +55,30 @@ def _load_panel(ingestion, tickers, start, end, interval):
 
 def main():
     args = parse_args()
-    tickers = [clean_ticker(t) for t in args.tickers.split(",")]
     benchmark = clean_ticker(args.benchmark)
 
-    ingestion = DataIngestionManager(source=args.source)
-    log.info("Loading %s and benchmark %s (%s to %s)", tickers, benchmark, args.start, args.end)
-    prices = _load_panel(ingestion, tickers, args.start, args.end, args.interval)
-    benchmark_prices = _load_panel(ingestion, [benchmark], args.start, args.end, args.interval)
+    if args.universe:
+        universe = create_universe(args.universe)
+    else:
+        universe = ListUniverse(args.tickers.split(","))
 
     strategy = create(args.strategy)
+    if strategy.single_asset and len(universe.tickers()) > 1:
+        raise SystemExit(
+            f"'{strategy.name}' is a single-asset strategy — pooling many names into one run is meaningless. "
+            f"Sweep it across the universe instead, e.g.:\n"
+            f"  python sweep.py --strategy={strategy.name} "
+            f"--universe={args.universe or 'sp500'} --benchmark={benchmark}"
+        )
+    if universe.stamp():
+        log.warning("BIAS: %s", universe.stamp())
+
+    log.info("Loading %d names + benchmark %s (%s to %s)",
+             len(universe.tickers()), benchmark, args.start, args.end)
+    ctx = build_context(universe, args.start, args.end, source=args.source, interval=args.interval)
+    benchmark_prices = _load_panel(
+        DataIngestionManager(source=args.source), [benchmark], args.start, args.end, args.interval)
+
     if args.rebalance:
         strategy.rebalance_freq = args.rebalance
     if args.reconstitute:
@@ -66,11 +87,11 @@ def main():
     if guards:
         log.info("Guardrails: %s", ", ".join(f"{g.name}({g.pct:.0%},{'trailing' if g.trailing else 'fixed'})" for g in guards))
     log.info("Running '%s' over %d trading days (rebalance=%s, reconstitute=%s)",
-             strategy.name, len(prices), strategy.rebalance_freq, strategy.reconstitution_freq)
-    res = run_backtest(strategy, prices, benchmark_prices, initial_capital=args.cash, guardrails=guards)
+             strategy.name, len(ctx.price), strategy.rebalance_freq, strategy.reconstitution_freq)
+    res = run_backtest(strategy, ctx, benchmark_prices, initial_capital=args.cash, guardrails=guards)
 
     res.display()
-    paths = write_reports(res, args.out, strategy.name, benchmark, prices)
+    paths = write_reports(res, args.out, strategy.name, benchmark, ctx.price)
     log.info("Wrote %d artifacts to %s/", len(paths), args.out)
     for label, path in paths.items():
         log.info("  %-14s %s", label, path)

@@ -99,12 +99,14 @@ class LongShortPE(TargetWeightStrategy):
 - **yfinance fundamentals are deliberately not used.** A second source would let the screener and the
   backtester silently disagree. Screen and backtest must read identical numbers.
 
-### Universe (`core/universe.py`, new)
+### Universe (`core/universe.py`)
 
-Start with **today's S&P 500**, `members` all-`True`, every artifact stamped *"survivorship-biased —
-indicative."* This is honest because it's labeled, and it unblocks all the machinery. The upgrade — historical
-membership (Wikipedia change-log for free, or Norgate/Sharadar paid) plus delisting / last-price liquidation —
-plugs into the same `members` mask later, again with no strategy changes.
+Start with **today's S&P 500**, read from a committed `data/sp500.csv` (paste the constituents table — a
+`Symbol` column, optionally `GICS Sector` / `GICS Sub-Industry`). A committed file is fully deterministic — no
+live scrape — so a backtest re-derives identically. `members` is all-`True`, so every artifact is stamped
+*"survivorship-biased — indicative."* This is honest because it's labeled, and it unblocks all the machinery.
+The upgrade — real historical membership plus delisting / last-price liquidation — fills the same `members`
+mask later, again with no strategy changes. `ListUniverse` wraps an explicit `--tickers` list the same way.
 
 ### Engine — keep `bt`, swappable
 
@@ -126,16 +128,19 @@ Backtest = run `weights(ctx)` over all history. Screen = read its last row. Pape
 broker (the existing `paper_trade.py` path). Research, backtest, and live can never drift, because they are the
 same function on the same data.
 
-### Research bed (`research/lab.py`, `research/report.py`, new)
+### Research bed (`research/`)
 
-- `compare(specs, ctx, benchmark)` — run N strategies / param sets against one universe in a single
-  `bt.run(*tests)` (bt returns one `Result` holding every equity curve), then emit a combined metrics table.
-- `sweep(cls, grid, ctx, benchmark)` — expand a param grid into specs, run, rank by a chosen metric.
-  Deterministic (seed any sampling; pin the data snapshot).
-- Reporting: a bias-stamped comparison table, an overlaid multi-equity explorer (extends
-  `reporting/interactive.py`), and a sweep heatmap. For a long/short book the headline diagnostic is
-  **beta ≈ 0** (market-neutrality) — `quantstats` already provides it. Closes the open "Portfolio comparison
-  view" from `docs/00-direction.md`.
+- **Universe sweep (built — `research/sweep.py`, `research/report.py`).** `sweep_universe(strategy, universe,
+  benchmark, …)` runs a **single-asset** rule independently on every name in a universe and returns a per-name
+  metrics frame (alpha / beta / Sharpe / return), with `quantstats` owning the metrics. The report
+  (`write_distribution_report`) writes per-name CSVs and an interactive **alpha-vs-beta scatter with marginal
+  histograms** — so momentum is judged on its *distribution across the market* (what fraction beat the
+  benchmark), not on one cherry-picked ticker. The `sweep.py` CLI drives it; every artifact carries the
+  universe's bias stamp.
+- **Strategy comparison (planned).** `compare(specs, ctx, benchmark)` — run N strategies / param sets against
+  one universe in a single `bt.run(*tests)` and emit a combined metrics table + overlaid equity explorer. For a
+  long/short book the headline diagnostic is **beta ≈ 0** (market-neutrality), which `quantstats` already
+  provides. Closes the open "Portfolio comparison view" from `docs/00-direction.md`.
 
 ### What's new vs reused
 
@@ -152,13 +157,13 @@ and EDGAR `frames` pulls a whole concept across all filers per quarter.
 
 ## Roadmap
 
-- **A — Interface migration (behavior-preserving).** Add `DataContext`; migrate strategies to `weights(ctx)`;
-  build a price-only context (`members` all-`True`, no fundamentals). Existing tests stay green. Establishes
-  the keystone.
-- **B — Universe + research bed (price only).** `core/universe.py` (labeled-biased S&P 500); universe-scale
-  cross-sectional backtests (this is the Home-Depot selection-bias fix for `momentum` / `xs_momentum`);
-  `research/` compare/sweep; bias-stamped reports; CAPM rolling beta as a derived feature.
-- **C — EDGAR point-in-time fundamentals.** `edgar_fetcher` + `core/fundamentals.py`; `ctx.fundamental("pe")`;
+- **A — Interface migration (behavior-preserving). [done]** `DataContext` + pluggable `core/sources.py`;
+  strategies migrated to `weights(ctx)`; price-only context (`members` all-`True`). All tests green.
+- **B — Universe + research bed (price only). [partly done]** `core/universe.py` (labeled-biased S&P 500 from
+  `data/sp500.csv`) + the single-asset **universe sweep** with the alpha/beta distribution report ship the
+  Home-Depot selection-bias fix for `momentum`. Still to do: the multi-strategy `compare`/param-sweep and
+  CAPM rolling beta as a derived feature.
+- **C — EDGAR point-in-time fundamentals. [deferred — next]** `edgar_fetcher` + `core/fundamentals.py`; `ctx.fundamental("pe")`;
   the `ls_pe` strategy; a fundamentals no-look-ahead test. First trustworthy fundamental backtest.
 - **D — Survivorship upgrade.** Historical membership into `members` + delisting / last-price handling. Removes
   the labeled bias through the same pipeline.

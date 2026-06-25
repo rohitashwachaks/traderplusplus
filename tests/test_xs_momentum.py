@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 
+from core.context import DataContext
 from strategies.cross_sectional_momentum import CrossSectionalMomentum
 
 
@@ -14,14 +15,18 @@ def _panel():
     }, index=dates)
 
 
+def _w(strat, prices):
+    return strat.weights(DataContext.from_prices(prices))
+
+
 def test_selects_top_by_momentum():
-    weights = CrossSectionalMomentum(lookback=20, top_n=1).weights(_panel()).iloc[-1]
+    weights = _w(CrossSectionalMomentum(lookback=20, top_n=1), _panel()).iloc[-1]
     assert weights["WIN"] == 1.0
     assert weights["MID"] == 0.0 and weights["LOSE"] == 0.0
 
 
 def test_top_n_holds_equal_weight_and_sums_to_one():
-    weights = CrossSectionalMomentum(lookback=20, top_n=2).weights(_panel()).iloc[-1]
+    weights = _w(CrossSectionalMomentum(lookback=20, top_n=2), _panel()).iloc[-1]
     assert weights.sum() == 1.0
     held = weights[weights > 0]
     assert len(held) == 2 and held.nunique() == 1   # equal weight among the two held
@@ -29,15 +34,15 @@ def test_top_n_holds_equal_weight_and_sums_to_one():
 
 def test_default_top_n_is_half_the_basket():
     # 3 tickers -> top half = 1
-    weights = CrossSectionalMomentum(lookback=20, top_n=None).weights(_panel()).iloc[-1]
+    weights = _w(CrossSectionalMomentum(lookback=20, top_n=None), _panel()).iloc[-1]
     assert (weights > 0).sum() == 1
 
 
 def test_no_lookahead():
     strat, prices = CrossSectionalMomentum(lookback=20, top_n=2), _panel()
-    full = strat.weights(prices)
+    full = _w(strat, prices)
     t = prices.index[60]
-    trunc = strat.weights(prices.loc[:t])
+    trunc = _w(strat, prices.loc[:t])
     assert (full.loc[t] == trunc.loc[t]).all()
 
 

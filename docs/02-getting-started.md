@@ -21,10 +21,25 @@ EDGAR fundamentals, screener = a strategy's latest row). See `docs/03-research-p
 python run.py --strategy=momentum --tickers=AAPL --benchmark=SPY --start=2023-01-01 --end=2024-01-01 --out=output/momentum
 ```
 
-Flags: `--strategy` (`buy_n_hold` | `momentum` | `xs_momentum`), `--tickers` (comma-separated),
-`--benchmark`, `--start`, `--end`, `--cash`, `--source` (`yahoo` | `polygon` | `alpaca`), `--interval`,
-`--out`. `xs_momentum` is cross-sectional momentum: rank a basket by trailing return, hold the top names
-equal-weighted, reconstituted monthly — give it several tickers.
+Flags: `--strategy` (`buy_n_hold` | `momentum` | `xs_momentum`), `--tickers` (comma-separated) **or**
+`--universe sp500`, `--benchmark`, `--start`, `--end`, `--cash`, `--source` (`yahoo` | `polygon` | `alpaca`),
+`--interval`, `--out`. `xs_momentum` is cross-sectional momentum: rank a basket by trailing return, hold the
+top names equal-weighted, reconstituted monthly — give it several tickers.
+
+## Sweep a single-asset rule across a universe
+
+`momentum` is a *single-asset* rule — running it on one hand-picked ticker is a cherry-pick (selection bias).
+To judge it honestly, sweep it across a whole universe and look at the **distribution** of alpha/beta:
+
+```bash
+python sweep.py --strategy=momentum --universe=sp500 --benchmark=SPY --start=2019-01-01 --end=2024-01-01 --out=output/sweep
+```
+
+Paste the S&P 500 constituents into `data/sp500.csv` first (a `Symbol` column, optionally `GICS Sector` /
+`GICS Sub-Industry`); use `--limit N` for a quick run on the first N names. It writes `per_name_metrics.csv`,
+`distribution_summary.csv` (median alpha/beta, % of names that beat the benchmark), and an interactive
+`alpha_beta_distribution.html`. Every artifact is stamped with the universe's survivorship-bias caveat.
+Running a single-asset strategy through `run.py --universe` is refused with a pointer here.
 
 **Rebalance / reconstitution (optional):** `--rebalance` and `--reconstitute` take `D|W|M|Q|Y` and override the
 strategy's defaults (both daily = trade whenever the signal changes). `--rebalance Q` trades back to target

@@ -3,6 +3,7 @@ from typing import Sequence
 import bt
 import pandas as pd
 
+from core.context import DataContext
 from engine import frequency
 from guardrails.base import Guardrail
 from strategies.base import TargetWeightStrategy
@@ -10,23 +11,24 @@ from strategies.base import TargetWeightStrategy
 
 def target_weights(
     strategy: TargetWeightStrategy,
-    prices: pd.DataFrame,
+    ctx: DataContext,
     guardrails: Sequence[Guardrail] | None = None,
 ) -> pd.DataFrame:
     """The strategy's target weights after guardrails and reconstitution sampling.
 
     Shared by the backtest and the paper-trading rebalancer so both compute the target the
     same way. Not yet reindexed/forward-filled onto the trading calendar — callers decide.
+    Guardrails stay price-based (risk overlays only need price), so they receive ``ctx.price``.
     """
-    weights = strategy.weights(prices)
+    weights = strategy.weights(ctx)
     for guardrail in guardrails or ():
-        weights = guardrail.apply(prices, weights)
+        weights = guardrail.apply(ctx.price, weights)
     return frequency.resample_reconstitution(weights, strategy.reconstitution_freq)
 
 
 def run(
     strategy: TargetWeightStrategy,
-    prices: pd.DataFrame,
+    ctx: DataContext,
     benchmark_prices: pd.DataFrame,
     initial_capital: float = 100_000.0,
     guardrails: Sequence[Guardrail] | None = None,
@@ -39,8 +41,8 @@ def run(
     unchanged. The benchmark is a one-off full allocation to its ticker.
 
     Args:
-        strategy: produces target weights from the price panel.
-        prices: dates x tickers panel the strategy trades.
+        strategy: produces target weights from the data context.
+        ctx: the data context the strategy trades (``ctx.price`` is the panel ``bt`` uses).
         benchmark_prices: single-column panel for the benchmark ticker.
         initial_capital: starting capital for both backtests.
         guardrails: risk overlays applied to the strategy's weights, in order.
@@ -48,7 +50,8 @@ def run(
     Returns:
         The combined ``bt`` result holding both the strategy and benchmark.
     """
-    weights = target_weights(strategy, prices, guardrails)
+    prices = ctx.price
+    weights = target_weights(strategy, ctx, guardrails)
     weights = weights.reindex(prices.index).ffill().fillna(0.0)
 
     strat = bt.Strategy(
