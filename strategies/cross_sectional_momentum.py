@@ -12,13 +12,18 @@ class CrossSectionalMomentum(TargetWeightStrategy):
     winners and drop the laggards. Meant for a basket of tickers — with one or two names it
     degenerates. Defaults to a monthly rebalance/reconstitution (override via the strategy's
     freq attributes or the CLI). Downside is left to a stop-loss guardrail, not a sign filter.
+
+    **Reference:** Jegadeesh & Titman (1993, 2001). "Returns to Buying Winners and Selling Losers"
+    and "Profitability of Momentum Strategies: An Evaluation of Alternative Explanations."
+    Journal of Finance. https://www.jstor.org/stable/2328882 — demonstrates that cross-sectional
+    momentum on 3–12 month lookbacks is a robust anomaly.
     """
 
     name = "xs_momentum"
     rebalance_freq = "M"
     reconstitution_freq = "M"
 
-    def __init__(self, lookback: int = 120, top_n: int | None = None):
+    def __init__(self, lookback: int = 30, top_n: int | None = None):
         if lookback < 1:
             raise ValueError("lookback must be >= 1")
         if top_n is not None and top_n < 1:

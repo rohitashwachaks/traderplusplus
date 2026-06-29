@@ -14,6 +14,11 @@ class LongShortPE(TargetWeightStrategy):
     then. Names with non-positive EPS are dropped (P/E is meaningless there). The book is only
     formed when at least ``2*n`` names have a valid P/E, so the long and short legs never
     overlap; weights are ``+1/n`` / ``-1/n`` and sum to ~0 (market-neutral → beta ≈ 0).
+
+    **Reference:** Fama & French (1992, 1993). "The Cross-section of Expected Stock Returns."
+    Journal of Finance. https://www.jstor.org/stable/2329112 — documents the value factor (low
+    P/E stocks outperform high P/E). This strategy isolates the value signal via dollar-neutral
+    long/short positioning.
     """
 
     name = "ls_pe"

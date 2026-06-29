@@ -2,6 +2,7 @@
 from strategies import (  # noqa: F401  (registers)
     buy_n_hold,
     cross_sectional_momentum,
+    dual_window_momentum,
     long_short_pe,
     momentum,
 )

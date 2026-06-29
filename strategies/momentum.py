@@ -13,6 +13,10 @@ class Momentum(TargetWeightStrategy):
     you sweep it over the whole universe (one independent single-name run each) and read the
     distribution of alpha/beta, which is what makes it honest rather than a cherry-pick. See
     ``research/sweep.py``.
+
+    **Reference:** Jegadeesh & Titman (1993). "Returns to Buying Winners and Selling Losers:
+    Implications for Stock Market Efficiency." Journal of Finance.
+    https://www.jstor.org/stable/2328882 — foundational work on momentum and trend-following.
     """
 
     name = "momentum"

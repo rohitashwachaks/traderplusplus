@@ -7,7 +7,10 @@ from strategies.base import TargetWeightStrategy, register
 @register("buy_n_hold")
 class BuyAndHold(TargetWeightStrategy):
     """Hold every in-universe name at equal weight. With a static all-in universe this is the
-    classic buy-once-and-hold; with a real membership mask it equal-weights the current members."""
+    classic buy-once-and-hold; with a real membership mask it equal-weights the current members.
+
+    **Reference:** Benchmark strategy. No academic paper — used to measure excess returns.
+    """
 
     name = "buy_n_hold"
 
