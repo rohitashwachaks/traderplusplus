@@ -1,97 +1,67 @@
-import importlib
-import inspect
-import pkgutil
 from abc import ABC, abstractmethod
+
 import pandas as pd
-from typing import Dict, Optional
 
-from contracts.asset import Asset
+from core.context import DataContext
+
+_REGISTRY: dict[str, type["TargetWeightStrategy"]] = {}
 
 
-class StrategyBase(ABC):
+def register(name: str):
+    """Register a strategy class under ``name`` for lookup via :func:`create`."""
+    def decorator(cls: type["TargetWeightStrategy"]) -> type["TargetWeightStrategy"]:
+        _REGISTRY[name] = cls
+        return cls
+    return decorator
+
+
+def create(name: str, **kwargs) -> "TargetWeightStrategy":
+    if name not in _REGISTRY:
+        raise ValueError(f"Unknown strategy '{name}'. Available: {sorted(_REGISTRY)}")
+    return _REGISTRY[name](**kwargs)
+
+
+def available() -> list[str]:
+    return sorted(_REGISTRY)
+
+
+class TargetWeightStrategy(ABC):
+    """A strategy maps a :class:`~core.context.DataContext` to target portfolio weights.
+
+    This is the single authoring interface: a strategy is *signal -> target weights*,
+    which covers rebalancing/reconstitution and (later) screener / AI / news signals.
+    The engine rebalances the portfolio toward whatever weights are returned. All data —
+    price, membership, fundamentals — is read through the context, so a strategy never
+    learns where a panel came from and new data sources don't change its code.
+
+    Two frequencies tune *when* the engine acts (both default to daily = trade whenever the
+    signal changes). A strategy can override them as class attributes, e.g. a quarterly
+    rebalance with a yearly reconstitution sets ``rebalance_freq = "Q"`` and
+    ``reconstitution_freq = "Y"``:
+
+    - ``rebalance_freq`` — how often to trade back to the target weights (correct drift).
+    - ``reconstitution_freq`` — how often to recompute the target (the selection + weights),
+      held constant in between.
+
+    ``single_asset`` marks a strategy whose rule is per-name and independent (e.g. an absolute
+    trend filter): it is validated by *sweeping* it across a universe one name at a time and
+    reading the distribution of outcomes, not by pooling names into one basket.
     """
-    Abstract base class for trading strategies.
-    All strategies must implement get_name and generate_signals.
-    """
 
-    def __init__(self):
-        self.lookback_period = None
+    name: str
+    rebalance_freq: str = "D"
+    reconstitution_freq: str = "D"
+    single_asset: bool = False
+    requires: tuple[str, ...] = ()  # context panels beyond price/members, e.g. ("eps",)
 
     @abstractmethod
-    def get_name(self) -> str:
+    def weights(self, ctx: DataContext) -> pd.DataFrame:
+        """Return target weights aligned to ``ctx.price`` (index = dates, columns = tickers).
+
+        Each row holds the desired fraction of portfolio value per ticker; rows sum to at
+        most 1 (the remainder stays in cash; long/short books may sum to ~0). **No
+        look-ahead:** the weight on date ``t`` may use information only through ``t``.
+        Strategies that act on a signal must apply their own one-bar lag here. Only hold
+        names that are in the universe on each date — mask by ``ctx.members``.
         """
-        Return unique strategy name for identification.
-        """
-        pass
-
-    @property
-    def lookback(self) -> int:
-        """
-        Return the lookback period in days for the strategy.
-        :return:
-        """
-        return self.lookback_period
-
-    @abstractmethod
-    def generate_signals(
-        self,
-        price_data: pd.DataFrame | Dict[str, pd.DataFrame],
-        current_date: pd.Timestamp,
-        positions: Dict[str, Asset],
-        cash: float,
-        **kwargs
-    ) -> Optional[Dict[str, int]]:
-        """
-        For each asset (ticker), return the Number of shares to buy or sell.
-        Output: { 'AAPL': 1, 'MSFT': -5, 'SPY': 0 }
-        Each signal should be:
-        - >0 : Long (number of shares to buy)
-        - <0 : Short (number of shares to sell)
-        - 0 : No action (hold)
-        Strategy must not look ahead beyond `current_date`.
-        :param price_data:
-        :param current_date:
-        :param positions:
-        :param cash:
-        :return: Dictionary of number of shares to buy/sell for each asset
-        """
-        pass
-
-
-class StrategyFactory:
-    _registry = {}
-
-    # @classmethod
-    # def __init__(cls):
-    #     for loader, module_name, is_pkg in pkgutil.iter_modules(__path__):
-    #         module = importlib.import_module(f"{__name__}.{module_name}")
-    #         for name, obj in inspect.getmembers(module):
-    #             if inspect.isclass(obj) and name.endswith("Strategy"):
-    #                 cls._registry[name] = obj
-
-    @classmethod
-    def register(cls, name):
-        def decorator(strategy_cls):
-            cls._registry[name] = strategy_cls
-            return strategy_cls
-        return decorator
-
-    @classmethod
-    def register_strategy(cls, name, strategy_cls):
-        cls._registry[name] = strategy_cls
-
-    @classmethod
-    def create_strategy(cls, name: str, **kwargs) -> StrategyBase:
-        if name not in cls._registry:
-            raise ValueError(f"Strategy '{name}' not registered.")
-        return cls._registry[name](**kwargs)
-
-    @classmethod
-    def get_supported_strategies(cls) -> set:
-        """
-        Return all registered strategy names
-        :return:
-        """
-        return set(cls._registry.keys())
-
-# StrategyFactory()
+        ...

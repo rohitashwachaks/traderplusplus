@@ -174,9 +174,11 @@ cython_debug/
 .pypirc
 .idea/
 .qodo/
+.claude/
 /data_cache
 /output
 product_roadmap.md
 /run
 /.run
 /.vscode
+/data

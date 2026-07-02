@@ -8,3 +8,7 @@ FIGURE_DIR = os.path.join(OUTPUT_DIR, 'figures')
 
 DATA_CACHE = os.environ.get('DATA_CACHE', './data_cache')
 POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY")
+
+ALPACA_API_KEY = os.environ.get("ALPACA_API_KEY")
+ALPACA_API_SECRET = os.environ.get("ALPACA_API_SECRET")
+ALPACA_BASE_URL = os.environ.get("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")

@@ -8,233 +8,155 @@
 >
 > I needed something that could:
 > - Let me write strategies quickly
-> - Simulate realistically
+> - Backtest them *honestly* — no look-ahead, no survivorship, no cherry-picking
 > - Go from backtest → paper → live with zero rewrites
 > - Show me how my portfolio’s actually doing, holistically!
 >
 > Existing tools? Clunky. Proprietary. Not programmable enough.
 >
 > So I built it — for myself first. Now, it’s for every quant who thinks like a developer.
->
-> **Unleash the power of modular, realistic, and extensible portfolio simulation.**
 
 ---
 
-## ✨ Why Trader++? 
+## ✨ What Trader++ is
 
-Trader++ isn’t just another backtesting tool. It’s a full-fledged quant trading engine built for:
-- **True Portfolio Simulation:** Manage multiple assets, cash, and trades as real portfolios—not just isolated strategies.
-- **Plug-and-Play Modularity:** Swap in new strategies, data sources, or risk guardrails with minimal code.
-- **Event-Driven Realism:** Simulate trades, slippage, and portfolio changes in a way that mimics real markets.
-- **Powerful Guardrails:** Risk management hooks that go beyond stop-losses—unregister assets, enforce capital limits, and more.
-- **Transparent & Hackable:** Built for experimentation, learning, and research. Every core component is swappable and inspectable.
+A **trustworthy personal research backtester**, evolving toward automated paper trading. **Correctness is the
+product** — a fast, pretty, subtly-wrong backtest loses real money. It runs on proven libraries
+([`bt`](https://pmorissette.github.io/bt/) for the engine, `ffn` + `quantstats` for metrics) and adds the thing
+those libraries don't give you: **discipline against the biases that make backtests lie.**
 
-**How is it different from Backtrader, Zipline, or QuantConnect?**
-- 🧩 **Cleaner separation of concerns:** Market data, strategies, execution, and portfolio logic are fully decoupled.
-- 🛡️ **Advanced guardrails:** Custom risk modules, not just basic stop-losses.
-- 💡 **Portfolio as a first-class citizen:** Track capital, trades, and metadata in one place.
-- 🧪 **Designed for research:** Easy to debug, extend, and run controlled experiments.
-- 🌱 **Open, modern, and Pythonic:** No black boxes, no vendor lock-in, and ready for your next big idea.
+- **No look-ahead, structurally.** A signal for day *t* uses only data through *t*; every strategy ships a test
+  that fails if it peeks.
+- **Universe-first, not ticker-first.** A rule is judged across a whole universe (S&P 500), never on one
+  hand-picked survivor. Single-name rules are *swept* across the market so you see the **distribution** of
+  alpha/beta, not a cherry-pick.
+- **Point-in-time fundamentals.** Fundamentals come from SEC EDGAR keyed to each value's **filing date**
+  (as-first-filed) — so a P/E strategy is ranked on what was *public* then, not today's snapshot.
+- **Biases are labeled, never hidden.** Every report stamps what it still can't promise (e.g. survivorship).
+- **Target weights, swappable everything.** Strategies express *target weights*; data sources, guardrails, and
+  the broker all sit behind small registries/ports.
 
----
-
-## 🏆 MVP Roadmap
-
-### 1. Unified Execution Engine
-- Common interface: `BacktestExecutor`, `PaperExecutor`, `LiveExecutor`
-- Live broker integration (Alpaca, IBKR, TD Ameritrade)
-- Real-time slippage, partial fills, latency simulation
-
-### 2. Advanced Strategy Framework
-- YAML/DSL config loader for no-code strategies
-- Multi-frequency, multi-asset support
-- ML model integration (Torch/Sklearn) + MLFlow/W&B logging
-
-### 3. Modular Risk & Portfolio Control
-- Position sizing (Kelly, risk parity, volatility targeting)
-- Real-time rule engine (e.g., freeze strategy on drawdown)
-- Hierarchical/nested portfolios with capital/risk constraints
-
-### 4. Performance & Attribution Analytics
-- Alpha, beta, Sharpe, Sortino, Calmar
-- Attribution by asset, sector, strategy
-- Trade replay and audit trail
-
-### 5. Interactive Visualization
-- Streamlit/Dash hybrid dashboard
-- Trade timeline, rolling metrics, slippage/turnover/holding histograms
-
-### 6. Scalable Simulation Engine
-- Multiprocessed/multithreaded backtesting core
-- GPU acceleration for ML strategies
-- Clean, event-driven simulation loop
-
-### 7. Data Layer
-- SQL/Parquet backend support
-- Live feed adapters
-- Flexible bar aggregators (time, volume, event)
-
-### 8. AI & Data-Driven Research
-- Sentiment and alt-data adapters (Reddit, news, Google Trends)
-- Cointegration, Kalman filter, auto-correlation modules
-
-### 9. Tests, Docs, Demos
-- Unit tests for each module
-- Example strategies (momentum, mean-reversion, breakout)
-- Jupyter/Streamlit demo notebooks
+Constraints that shape it: daily bars (no intraday/HFT), holds ~1 day–6 months, rebalancing/reconstitution
+style. Full rationale and roadmap in **[`docs/00-direction.md`](docs/00-direction.md)** and
+**[`docs/03-research-platform.md`](docs/03-research-platform.md)**.
 
 ---
 
-## 🚦 MVP Status (June 2025)
-
-| Feature                           | Status      | Notes                                                                                                          |
-|-----------------------------------|-------------|----------------------------------------------------------------------------------------------------------------|
-| Unified Execution Engine          | ✅ Complete | Backtest, Paper, Live modes implemented with shared API. Paper & Live mode requires broker API implementation. |
-| Modular Strategy Framework        | ✅ Complete | StrategyBase and example strategies present. Plug-and-play.                                                    |
-| Portfolio/Risk Management         | ✅ Complete | Portfolio class, guardrails, position sizing hooks implemented.                                                |
-| Analytics & Attribution           | ✅ Partial  | Core metrics (Sharpe, alpha, etc.) present. Some advanced analytics in progress.                               |
-| Interactive Dashboard             | ⚠️ Partial | Streamlit app exists, some features stubbed or in progress.                                                    |
-| Scalable Simulation Engine        | ⚠️ Partial | Event-driven core present; multiprocessing support basic or planned.                                           |
-| Data Layer                        | ✅ Complete | Data ingestion, caching, and basic adapters present.                                                           |
-| ML/DSL Integration                | 🚧 Planned  | ML model integration and YAML/DSL loader planned.                                                              |
-
----
-
-## Next Steps (Post-MVP)
-- Expand broker integrations for live trading
-- Enhance dashboard with more analytics and controls
-- Add ML/DSL strategy support
-- Improve test coverage and documentation
-
----
-
-## 🧠 Objective
-
-Empower quants and developers to:
-- Cleanly separate market data, strategies, execution logic, and portfolio tracking
-- Run realistic, event-driven backtests and simulations
-- Plug-and-play both single-asset and multi-asset strategies
-
-Built for robust experimentation and real-world readiness, with proper portfolio management and capital accounting.
-
----
-
-## 🗺️ System Architecture
+## 🗺️ Architecture
 
 ```mermaid
 flowchart TD
-    subgraph Data Layer
-      A[MarketData]
-    end
-    subgraph Strategy Layer
-      B[StrategyBase]
-    end
-    subgraph Execution Layer
-      C[PortfolioExecutor]
-      D[Guardrails]
-    end
-    subgraph Portfolio & Analytics
-      E[Portfolio]
-      F[Performance Analytics]
-    end
-    A -- Price/Volume Data --> B
-    B -- Signals --> C
-    C -- Orders/Trades --> E
-    C -- Risk Checks --> D
-    D -- Approve/Block Trades --> C
-    E -- Holdings/PnL --> F
-    F -- Reports --> E
+    U[Universe<br/>SP500 from data/sp500.csv · membership mask]
+    A[PanelSource registry<br/>price · EDGAR eps]
+    B[DataContext<br/>price · members · meta · fundamental name]
+    C[TargetWeightStrategy<br/>weights ctx → target weights]
+    D[bt engine<br/>WeighTarget + Rebalance, vs benchmark]
+    E[reporting<br/>CSVs, plots, quantstats tearsheet, explorer]
+    S[research/ sweep<br/>single-asset rule across the universe → alpha/beta distribution]
+    U --> A --> B
+    B -- weights(ctx) --> C
+    C -- target weights --> D --> E
+    B -.-> S --> E
 ```
 
----
-
-## 🏗️ Project Structure & Architecture
-
-- `contracts/` — Core contracts and abstract base classes (Portfolio, StrategyBase, Executor)
-- `core/` — Core logic, execution engines, simulation loop
-- `strategies/` — Example and user strategies (momentum, buy & hold, etc.)
-- `data_ingestion/`, `data_cache/` — Data loaders, adapters, and caching for reproducible research
-- `analytics/`, `ml_engine/` — Analytics, reporting, and ML integrations
-- `dashboard/` — Streamlit/Dash dashboard for visualization
-- `run_backtest.py` — CLI entry point to run backtests
-- `main.py`, `run/` — Additional CLI tools and runners
+`data → DataContext → strategy weights → bt → reports`. A strategy reads everything through one `DataContext`
+(`ctx.price`, `ctx.members`, `ctx.fundamental("eps")`), so new data sources plug in without touching strategies.
 
 ---
 
-## 🚦 Development Roadmap (Next Steps)
+## 🧪 Strategies (built-in)
 
-1. **Finalize Core Contracts**
-   - Audit and refine `Portfolio`, `StrategyBase`, and `PortfolioExecutor` for strict modularity and safety (no future leaks).
-2. **Strategy API**
-   - Enforce and document the `generate_signals` interface. Add more example strategies.
-3. **Backtesting Engine**
-   - Expand test coverage and logging in `run_backtest.py` and `core/executors/backtest.py`.
-4. **Data Layer**
-   - Ensure robust, reproducible data ingestion and caching. Document data contracts.
-5. **CLI & Developer Experience**
-   - Improve CLI usability and add clear usage examples.
-6. **Dashboard & Analytics**
-   - Expand analytics and dashboard integration for portfolio and strategy reporting.
-7. **Documentation**
-   - Add docstrings, inline docs, and contribution guidelines for new modules and strategies.
-
----
-
-## 🔧 Core Components
-
-| Module            | Purpose                                                                 |
-|-------------------|-------------------------------------------------------------------------|
-| Portfolio         | Tracks assets, cash, trades, and strategy metadata. Self-contained unit. |
-| PortfolioExecutor | Orchestrates strategy execution, manages trade logic, evaluates guards.  |
-| MarketData        | Historical price data & sliding window views for strategies.             |
-| StrategyBase      | Interface for strategy design, single/multi-asset support.               |
-| Backtester        | Runs simulations, exports performance reports and logs.                  |
-
----
-
-## 💡 Main Features
-
-- 📈 **Backtesting Engine** — Realistic execution, guardrails, cash shares checks
-- 🧠 **Pluggable Strategy Interface** — Stateful/stateless signal generation
-- 💼 **Portfolio Tracking** — Accurate PnL with trade logs, equity curves
-- 🛡️ **GuardrailBase System** — Risk management hooks (stop-loss, asset unregister)
-- 📊 **Performance Reporting** — Sharpe, max drawdown, win rate, CAGR, more
-- 🔬 **Benchmark Comparison** — Alpha, beta, vs SPY or other tickers
-- 🧪 **Test Strategies** — Debug pipeline (e.g., “buy once on day 1”)
+| Name | Kind | Idea |
+|------|------|------|
+| `buy_n_hold` | basket | Equal-weight all in-universe names (the benchmark baseline). |
+| `momentum` | single-asset | SMA crossover, in-or-cash per name. Judge it by *sweeping* the universe. |
+| `xs_momentum` | basket | Cross-sectional: hold the top trailing-return names, reconstituted monthly. |
+| `dual_momentum` | basket | Rank by short-vs-long *rate* (accelerating momentum). |
+| `ls_pe` | basket, long/short | Dollar-neutral: long cheapest P/E, short richest, on point-in-time EDGAR EPS. |
 
 ---
 
 ## 🚀 Quickstart
 
-1. **Install Requirements**
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. **Run a Backtest**
-   ```bash
-   python main.py --start=2022-05-29 --end=2025-05-29 --cash 50000 --plot --export --tickers=META --refresh --strategy=momentum --benchmark=META --guardrail=trailing_stop_loss
-   ```
-3. **Add a New Strategy**
-   - Implement a new class in `strategies/` inheriting from `StrategyBase` and implementing `generate_signals()`.
-   - Register your strategy by importing it in `strategies/__init__.py`.
+```bash
+pip install -r requirements.txt
+```
 
-4  **Add a New Guardrail**
-   - Implement a new class in `guardrails/` inheriting from `GuardrailBase` and implementing `evaluate()`.
-   - Register your guardrail by importing it in `guardrails/__init__.py`.
+```bash
+# Backtest a basket strategy over the S&P 500 (paste constituents into data/sp500.csv first)
+python run.py --strategy=xs_momentum --universe=sp500 --benchmark=SPY --start=2019-01-01 --end=2024-01-01
+
+# A point-in-time long/short value book (pulls annual EPS from SEC EDGAR)
+python run.py --strategy=ls_pe --universe=sp500 --limit=50 --benchmark=SPY --start=2018-01-01 --end=2024-01-01
+
+# Sweep a single-asset rule across the whole universe → alpha/beta distribution
+python sweep.py --strategy=momentum --universe=sp500 --benchmark=SPY --start=2019-01-01 --end=2024-01-01
+```
+
+Artifacts land in `--out` (default `output/`): `equity_curve.csv`, `daily_returns.csv`, `stats.csv`,
+`metrics.csv`, `equity_vs_benchmark.png`, `drawdown.png`, `tearsheet.html`, `equity_explorer.html` (and, for a
+sweep, `per_name_metrics.csv` + `alpha_beta_distribution.html`). See
+**[`docs/02-getting-started.md`](docs/02-getting-started.md)** for all flags, guardrails, and paper trading.
+
+### Add a strategy
+
+```python
+# strategies/my_strategy.py
+import pandas as pd
+from core.context import DataContext
+from strategies.base import TargetWeightStrategy, register
+
+@register("my_strategy")
+class MyStrategy(TargetWeightStrategy):
+    name = "my_strategy"
+    requires = ()                       # extra context panels, e.g. ("eps",)
+
+    def weights(self, ctx: DataContext) -> pd.DataFrame:
+        prices = ctx.price.where(ctx.members)            # only hold in-universe names
+        signal = (prices > prices.rolling(50).mean()).astype(float)
+        w = signal.div(signal.sum(axis=1).where(lambda s: s > 0), axis=0).fillna(0.0)
+        return w.shift(1).fillna(0.0)                    # decide t, act t+1 — no look-ahead
+```
+
+Import it in `strategies/__init__.py` and **ship a no-look-ahead test** in `tests/` (truncating the future must
+not change a past weight). That test is the credibility gate — see `AGENT.md`.
+
 ---
 
-## 🤝 Contributing
+## 🏗️ Project structure
 
-[//]: # (- See the Development Roadmap above for high-priority areas.)
-- Add new strategies, data adapters, or analytics modules as composable units.
-- Follow modular design and document your code.
-- PRs and issues welcome!
+```text
+data_ingestion/   provider fetchers (yahoo, polygon, alpaca) + edgar_fetcher.py (SEC XBRL, filed dates)
+core/             data_loader (parquet cache) · price_panel · sources (PanelSource registry) ·
+                  context (DataContext) · universe (SP500, membership) · fundamentals (point-in-time EPS)
+data/sp500.csv    pasted S&P 500 constituents (committed input)
+strategies/       base (registry, weights(ctx)) + buy_n_hold · momentum · xs_momentum · dual_momentum · ls_pe
+guardrails/       base (registry) + stop_loss — risk overlays on weights
+engine/           runner (bt backtest + benchmark) · frequency · paper (rebalance plan)
+research/         sweep (single-asset across a universe) + report (alpha/beta distribution)
+reporting/        report (CSVs, PNGs, quantstats tearsheet) · interactive (plotly equity explorer)
+brokers/          base (Broker port) · alpaca (paper, REST)
+run.py            backtest CLI      sweep.py  universe-sweep CLI      paper_trade.py  paper-rebalance CLI
+tests/            no-look-ahead + smoke + guardrail/frequency/paper + data-layer + sweep + fundamentals
+```
 
 ---
 
-## 🌱 Vision for Future Work
+## 🚦 Status
 
-See the MVP Roadmap above for our ambitious next steps!
+| Area | Status | Notes |
+|------|--------|-------|
+| Engine on `bt` + metrics | ✅ | Rebalancing backtests; `ffn`/`quantstats` own Sharpe/alpha/beta/drawdown. |
+| Strategy framework | ✅ | `TargetWeightStrategy` registry, `weights(ctx)`, 5 built-in strategies. |
+| Pluggable data layer | ✅ | `PanelSource` registry, `DataContext`, SP500 universe + membership mask. |
+| Point-in-time fundamentals | ✅ v1 | SEC EDGAR annual EPS (as-first-filed); `ls_pe` long/short. TTM/market-cap next. |
+| Universe sweep + distribution | ✅ | Per-name alpha/beta across a universe; interactive chart. |
+| Guardrails / risk | ◑ | Stop-loss done; vol targeting / position caps planned. |
+| Paper trading | ◑ | Alpaca paper rebalance (preview by default, `--execute`); scheduling + reconciliation pending. |
+| Survivorship-free universe | ✗ | Universe is today's members (labeled biased). Real historical membership planned. |
+| Live trading / dashboard / ML | ✗ | Future phases. |
+
+Planned work, ideas, and open decisions live in **[`docs/04-backlog.md`](docs/04-backlog.md)**.
 
 ---
 
@@ -242,12 +164,6 @@ See the MVP Roadmap above for our ambitious next steps!
 
 Distributed under the Apache-2.0 License.
 
----
-
 ## 📬 Contact
 
-Open an issue or reach out at [rohitashwachaks@gmail.com] for questions and collaboration!
-
----
-
-Enjoy building and experimenting with Trader++! 🚀
+Open an issue or reach out at rohitashwachaks@gmail.com for questions and collaboration.

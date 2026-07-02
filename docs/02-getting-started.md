@@ -1,146 +1,135 @@
-# Getting Started with Trader++
+# Getting Started
 
-## 📋 Prerequisites
-
-- **Python**: 3.8 or higher
-- **Operating System**: macOS, Linux, or Windows
-- **Basic Knowledge**: Python, pandas, basic trading concepts
-
-## 🔧 Installation
-
-### 1. Clone the Repository
+## Install
 
 ```bash
-git clone https://github.com/yourusername/traderplusplus.git
-cd traderplusplus
+pip install -r requirements.txt   # or: pip install -e .
 ```
 
-### 2. Install Dependencies
+Core stack: `bt` (engine), `ffn` + `quantstats` (metrics), `yfinance` (data). Requires Python ≥ 3.10 and
+pandas ≥ 2.2.
+
+Where this is heading: a universe-first, point-in-time research platform (cross-sectional backtests,
+EDGAR fundamentals, screener = a strategy's latest row). See `docs/03-research-platform.md`.
+
+> On this machine the conda env is `options-trading` and the `conda` shell function is broken, so call the
+> interpreter by path: `/Users/rchaks/opt/miniforge3/envs/options-trading/bin/python`.
+
+## Run a backtest
 
 ```bash
-pip install -r requirements.txt
+python run.py --strategy=momentum --tickers=AAPL --benchmark=SPY --start=2023-01-01 --end=2024-01-01 --out=output/momentum
 ```
 
-### 3. Verify Installation
+Flags: `--strategy` (`buy_n_hold` | `momentum` | `xs_momentum` | `dual_momentum` | `ls_pe`), `--tickers` (comma-separated) **or**
+`--universe sp500` (with `--limit N` for quick runs), `--benchmark`, `--start`, `--end`, `--cash`, `--source`
+(`yahoo` | `polygon` | `alpaca`), `--interval`, `--out`. `xs_momentum` is cross-sectional momentum (rank a
+basket by trailing return, hold the top names equal-weighted, monthly). `ls_pe` is a dollar-neutral long/short
+on **point-in-time P/E** (long cheapest, short richest) — it pulls annual EPS from SEC EDGAR, keyed to filing
+date, so give it a universe (e.g. `--universe sp500 --limit 50`).
+
+## Sweep a single-asset rule across a universe
+
+`momentum` is a *single-asset* rule — running it on one hand-picked ticker is a cherry-pick (selection bias).
+To judge it honestly, sweep it across a whole universe and look at the **distribution** of alpha/beta:
 
 ```bash
-python -c "import pandas, numpy, yfinance; print('✅ Installation successful!')"
+python sweep.py --strategy=momentum --universe=sp500 --benchmark=SPY --start=2019-01-01 --end=2024-01-01 --out=output/sweep
 ```
 
-## 🚀 Your First Backtest
+Paste the S&P 500 constituents into `data/sp500.csv` first (a `Symbol` column, optionally `GICS Sector` /
+`GICS Sub-Industry`); use `--limit N` for a quick run on the first N names. It writes `per_name_metrics.csv`,
+`distribution_summary.csv` (median alpha/beta, % of names that beat the benchmark), and an interactive
+`alpha_beta_distribution.html`. Every artifact is stamped with the universe's survivorship-bias caveat.
+Running a single-asset strategy through `run.py --universe` is refused with a pointer here.
 
-### Using the CLI
+**Rebalance / reconstitution (optional):** `--rebalance` and `--reconstitute` take `D|W|M|Q|Y` and override the
+strategy's defaults (both daily = trade whenever the signal changes). `--rebalance Q` trades back to target
+quarterly; `--reconstitute Y` recomputes the target (selection + weights) yearly and holds it constant in
+between. A strategy can also set these as class attributes (`rebalance_freq`, `reconstitution_freq`).
+
+**Risk guardrail (optional):** add `--stop-loss 0.05` for a 5% stop (configurable). It's trailing by default
+(stop measured from the peak since entry); use `--stop-loss-mode fixed` to stop from the entry price instead.
+Because we only have daily bars, a breach is detected on a day's close and the exit lands on the next close —
+no intraday or optimistic stop-price fills. A stopped ticker goes to cash and stays out until the strategy
+re-enters it.
 
 ```bash
-python run_backtest.py \
-    --strategy=momentum \
-    --tickers=AAPL \
-    --start=2023-01-01 \
-    --end=2024-01-01 \
-    --cash=100000 \
-    --benchmark=SPY \
-    --plot \
-    --export
+python run.py --strategy=momentum --tickers=AAPL --benchmark=SPY --start=2022-01-01 --end=2024-01-01 --stop-loss=0.05
 ```
 
-### Python Script
+Artifacts written to `--out`:
+
+| File | Contents |
+|------|----------|
+| `equity_curve.csv` | Strategy and benchmark equity (NAV) per day |
+| `daily_returns.csv` | Daily returns |
+| `stats.csv` | `bt` performance table (CAGR, Sharpe, max drawdown, …) |
+| `metrics.csv` | quantstats metrics vs benchmark (alpha, beta, Sortino, VaR, win rates, …) |
+| `equity_vs_benchmark.png` | Rebased equity vs benchmark |
+| `drawdown.png` | Strategy drawdown |
+| `tearsheet.html` | Full quantstats tearsheet (distribution, rolling Sharpe, alpha/beta, risk) |
+| `equity_explorer.html` | Interactive: equity + underlying prices + buy/sell markers; hover shows the portfolio split that day |
+
+## How it fits together
+
+`data → DataContext → strategy weights → bt → reports`
+
+- `core/data_loader.py` — `DataIngestionManager.get_data()` fetches OHLCV (cached as parquet).
+- `core/sources.py` + `core/context.py` — `build_context()` assembles a `DataContext` (price + any extra
+  panels a strategy declares), outer-joining the universe and forward-filling fundamentals point-in-time.
+- `core/universe.py` — the tradable set (`SP500` from `data/sp500.csv`) and its membership mask.
+- `strategies/` — a strategy maps the `DataContext` to **target weights**.
+- `engine/runner.py` — `run()` executes the strategy + a buy-and-hold benchmark on `bt`.
+- `reporting/report.py` — `write_reports()` writes the artifacts above.
+
+## Add a strategy
+
+Subclass `TargetWeightStrategy`, read data through the `DataContext`, and return target weights. Apply any
+signal lag *inside* `weights()` so the strategy never looks ahead, and only hold names where `ctx.members` is
+true. Declare any non-price data via `requires` (e.g. `("eps",)`).
 
 ```python
-from core.backtester import Backtester
-from core.market_data import MarketData
-from core.data_loader import DataIngestionManager
-from contracts.portfolio import Portfolio
-from executors.backtest import BacktestExecutor
+# strategies/my_strategy.py
+import pandas as pd
+from core.context import DataContext
+from strategies.base import TargetWeightStrategy, register
 
-# Setup Portfolio
-portfolio = Portfolio(
-    name="My First Portfolio",
-    tickers="AAPL",
-    starting_cash=100000.0,
-    strategy="buy_n_hold",
-    benchmark="SPY"
-)
+@register("my_strategy")
+class MyStrategy(TargetWeightStrategy):
+    name = "my_strategy"
+    requires = ()                       # extra context panels, e.g. ("eps",)
 
-# Setup Market Data
-ingestion = DataIngestionManager(source="yahoo")
-market_data = MarketData(ingestion, simulation_start_date="2023-01-01")
-
-# Setup Executor
-executor = BacktestExecutor(portfolio=portfolio, market_data=market_data)
-
-# Run Backtest
-backtester = Backtester(
-    strategy=portfolio.strategy,
-    market_data=market_data,
-    portfolio=portfolio,
-    executor=executor
-)
-
-backtester.run(start_date="2023-01-01", end_date="2024-01-01")
-
-# View Results
-print(f"Final Net Worth: ${backtester.get_final_net_worth():,.2f}")
-print(backtester.get_trade_log())
+    def weights(self, ctx: DataContext) -> pd.DataFrame:
+        prices = ctx.price.where(ctx.members)            # only in-universe names
+        signal = (prices > prices.rolling(50).mean()).astype(float)
+        weights = signal.div(signal.sum(axis=1).where(lambda s: s > 0), axis=0).fillna(0.0)
+        return weights.shift(1).fillna(0.0)              # decide on t, act on t+1
 ```
 
-## 📊 Understanding the Output
+Then import it in `strategies/__init__.py` and ship a no-look-ahead test (see `tests/test_no_lookahead.py`):
+truncating future rows must not change a past weight. A *single-asset* rule sets `single_asset = True` and is
+validated with `sweep.py` instead of being pooled into a basket.
 
-### Trade Log
-```
-                ticker  action  shares    price  cash_remaining
-date                                                            
-2023-01-03      AAPL     BUY      100   125.07      87493.00
-2023-02-15      AAPL    SELL      100   155.33     102993.00
-```
+## Paper trading
 
-### Equity Curve
-```
-                net_worth  benchmark
-date                                
-2023-01-03      100000.00     100.00
-2023-01-04      101250.00     100.50
-```
+`paper_trade.py` rebalances an **Alpaca paper** account toward the strategy's *current* target weights — same
+strategy / guardrail / frequency flags as the backtest. It **previews by default** (prints the order plan and
+submits nothing); add `--execute` to actually send the orders.
 
-### Performance Metrics
-```
-portfolio_return: 0.1523
-sharpe: 0.6934
-alpha: 0.0234
-max_drawdown: -0.1523
+```bash
+# preview
+python paper_trade.py --strategy=momentum --tickers=AAPL,MSFT --stop-loss=0.05
+# actually submit to Alpaca paper
+python paper_trade.py --strategy=momentum --tickers=AAPL,MSFT --stop-loss=0.05 --execute
 ```
 
-## 🎯 Basic Workflow
+It reads `ALPACA_API_KEY` / `ALPACA_API_SECRET` from `.env`, talks to the REST API over `requests` (paper host
+only — asserted), sizes whole-share market orders against your account equity, and sells before buying so
+closing trades fund the openings. To automate, run it on a schedule (cron / `/schedule`) — there's no daemon.
 
-1. **Define Your Strategy**: Choose from built-in or create custom
-2. **Configure Portfolio**: Set tickers, cash, strategy, guardrails
-3. **Setup Data Source**: Yahoo Finance, Alpaca, or Polygon
-4. **Choose Execution Mode**: Backtest, Paper, or Live
-5. **Run and Analyze**: Execute and evaluate results
+## Test
 
-## 🐛 Troubleshooting
-
-### Data Download Issues
-- Check ticker symbol is valid
-- Verify date range has trading days
-- Try `--refresh` to force data re-download
-
-### Import Errors
-- Ensure you're in the project root directory
-- Add project to PYTHONPATH if needed
-
-### Strategy Not Found
-- Check strategy is registered in `strategies/__init__.py`
-- Verify `@StrategyFactory.register("name")` decorator
-
-## 📚 Next Steps
-
-1. **Learn Strategy Development**: [Strategy Development Guide](./05-strategies.md)
-2. **Understand Core Components**: [Core Components](./03-core-components.md)
-3. **Explore Examples**: [Examples & Tutorials](./12-examples.md)
-
----
-
-**Related Documentation**:
-- [Overview & Architecture](./01-overview-architecture.md)
-- [Strategy Development](./05-strategies.md)
-- [Examples & Tutorials](./12-examples.md)
+```bash
+python -m pytest tests/ -q
+```
