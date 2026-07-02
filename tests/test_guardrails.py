@@ -71,3 +71,25 @@ def test_invalid_pct_raises():
         except ValueError:
             continue
         raise AssertionError(f"expected ValueError for pct={bad}")
+
+
+def test_stop_loss_catches_intramonth_crashes():
+    """Stop loss must detect crashes that occur between rebalance dates (e.g., intramonth).
+    Regression test for: guardrails were reindexing prices to weight dates, missing
+    intermediate crashes."""
+    import numpy as np
+    dates = pd.date_range("2022-01-01", periods=100, freq="B")
+    t = np.arange(100)
+    # Stock rises to peak at day 50 (price 150), then crashes (day 54: 130, -13% from peak)
+    prices = np.concatenate([100 + t[:50], 150 - 5 * (t[50:70] - 50), np.full(30, 50)])
+    prices_df = pd.DataFrame({"TEST": prices}, index=dates)
+
+    # Buy-and-hold keeps wanting to hold
+    weights = _w(BuyAndHold(), prices_df)
+    adjusted = StopLoss(0.10, trailing=True).apply(prices_df, weights)["TEST"]
+
+    # Verify: with full daily price visibility, stop loss detects the intramonth crash.
+    # Days 50-53: still holding (price still > 90% of peak)
+    # Day 54 onwards: stopped out (price fell 13% from peak)
+    assert (adjusted[50:54] == 1.0).all(), "should hold on days 50-53 (before breach)"
+    assert (adjusted[54:] == 0.0).all(), "should be stopped out from day 54 onward (breach on day 54)"

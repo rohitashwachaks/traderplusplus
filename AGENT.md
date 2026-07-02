@@ -111,7 +111,7 @@ core/universe.py     Universe (ListUniverse, SP500 from data/sp500.csv) + point-
 core/fundamentals.py annual_eps_series (as-first-filed) + EpsSource (point-in-time EPS panel)
 data_ingestion/edgar_fetcher.py  SEC EDGAR: ticker→CIK map + cached companyconcept facts (filed dates)
 data/sp500.csv       pasted S&P 500 constituents (Symbol[, GICS Sector, GICS Sub-Industry]) — committed input
-strategies/          base.py (TargetWeightStrategy + registry, freq, single_asset, requires), buy_n_hold.py, momentum.py (single-asset), cross_sectional_momentum.py, long_short_pe.py (ls_pe, requires eps)
+strategies/          base.py (TargetWeightStrategy + registry, freq, single_asset, requires), buy_n_hold.py, momentum.py (single-asset), cross_sectional_momentum.py (xs_momentum), dual_window_momentum.py (dual_momentum), long_short_pe.py (ls_pe, requires eps)
 guardrails/          base.py (Guardrail + registry), stop_loss.py — risk overlays on weights
 research/            sweep.py (single-asset rule across a universe → per-name alpha/beta), report.py (distribution chart)
 engine/runner.py     builds & runs the bt backtest (+ benchmark), applies guardrails + frequencies

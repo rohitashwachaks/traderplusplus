@@ -6,8 +6,12 @@ Trader++ is a personal research backtester built on [`bt`](https://pmorissette.g
 ## Contents
 
 - **[Direction & Roadmap](./00-direction.md)** — what we're building, current state, and next steps. Start here.
-- **[Getting Started](./02-getting-started.md)** — install, run a backtest, add a strategy, run tests.
-- **[Data Ingestion & Sources](./08-data-ingestion.md)** — Yahoo / Polygon / Alpaca fetchers and the cache.
+- **[Getting Started](./02-getting-started.md)** — install, run a backtest, sweep a universe, add a strategy, tests.
+- **[Research Platform](./03-research-platform.md)** — universe-first, point-in-time design: `DataContext`,
+  universe, EDGAR fundamentals, the bias reckoning, and the phased roadmap.
+- **[Backlog & Open Decisions](./04-backlog.md)** — planned features, ideas to explore, decisions to revisit.
+- **[Data Ingestion & Sources](./08-data-ingestion.md)** — Yahoo / Polygon / Alpaca / EDGAR fetchers, the cache,
+  and how raw data becomes a `DataContext`.
 
 Coding rules for agents and contributors live in [`../AGENT.md`](../AGENT.md).
 

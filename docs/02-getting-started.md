@@ -21,7 +21,7 @@ EDGAR fundamentals, screener = a strategy's latest row). See `docs/03-research-p
 python run.py --strategy=momentum --tickers=AAPL --benchmark=SPY --start=2023-01-01 --end=2024-01-01 --out=output/momentum
 ```
 
-Flags: `--strategy` (`buy_n_hold` | `momentum` | `xs_momentum` | `ls_pe`), `--tickers` (comma-separated) **or**
+Flags: `--strategy` (`buy_n_hold` | `momentum` | `xs_momentum` | `dual_momentum` | `ls_pe`), `--tickers` (comma-separated) **or**
 `--universe sp500` (with `--limit N` for quick runs), `--benchmark`, `--start`, `--end`, `--cash`, `--source`
 (`yahoo` | `polygon` | `alpaca`), `--interval`, `--out`. `xs_momentum` is cross-sectional momentum (rank a
 basket by trailing return, hold the top names equal-weighted, monthly). `ls_pe` is a dollar-neutral long/short
@@ -73,36 +73,43 @@ Artifacts written to `--out`:
 
 ## How it fits together
 
-`data → price panel → strategy weights → bt → reports`
+`data → DataContext → strategy weights → bt → reports`
 
 - `core/data_loader.py` — `DataIngestionManager.get_data()` fetches OHLCV (cached as parquet).
-- `core/price_panel.py` — `to_price_panel()` builds the tz-naive close-price panel `bt` trades.
-- `strategies/` — a strategy maps the panel to **target weights**.
+- `core/sources.py` + `core/context.py` — `build_context()` assembles a `DataContext` (price + any extra
+  panels a strategy declares), outer-joining the universe and forward-filling fundamentals point-in-time.
+- `core/universe.py` — the tradable set (`SP500` from `data/sp500.csv`) and its membership mask.
+- `strategies/` — a strategy maps the `DataContext` to **target weights**.
 - `engine/runner.py` — `run()` executes the strategy + a buy-and-hold benchmark on `bt`.
 - `reporting/report.py` — `write_reports()` writes the artifacts above.
 
 ## Add a strategy
 
-Subclass `TargetWeightStrategy` and return target weights. Apply any signal lag *inside* `weights()` so the
-strategy never looks ahead.
+Subclass `TargetWeightStrategy`, read data through the `DataContext`, and return target weights. Apply any
+signal lag *inside* `weights()` so the strategy never looks ahead, and only hold names where `ctx.members` is
+true. Declare any non-price data via `requires` (e.g. `("eps",)`).
 
 ```python
 # strategies/my_strategy.py
 import pandas as pd
+from core.context import DataContext
 from strategies.base import TargetWeightStrategy, register
 
 @register("my_strategy")
 class MyStrategy(TargetWeightStrategy):
     name = "my_strategy"
+    requires = ()                       # extra context panels, e.g. ("eps",)
 
-    def weights(self, prices: pd.DataFrame) -> pd.DataFrame:
+    def weights(self, ctx: DataContext) -> pd.DataFrame:
+        prices = ctx.price.where(ctx.members)            # only in-universe names
         signal = (prices > prices.rolling(50).mean()).astype(float)
         weights = signal.div(signal.sum(axis=1).where(lambda s: s > 0), axis=0).fillna(0.0)
-        return weights.shift(1).fillna(0.0)   # decide on t, act on t+1
+        return weights.shift(1).fillna(0.0)              # decide on t, act on t+1
 ```
 
 Then import it in `strategies/__init__.py` and ship a no-look-ahead test (see `tests/test_no_lookahead.py`):
-truncating future rows must not change a past weight.
+truncating future rows must not change a past weight. A *single-asset* rule sets `single_asset = True` and is
+validated with `sweep.py` instead of being pooled into a basket.
 
 ## Paper trading
 

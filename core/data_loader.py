@@ -1,12 +1,15 @@
-import os
 import hashlib
+import logging
+import os
 from datetime import datetime, timedelta
+from typing import Dict, List, Optional
 
 import pandas as pd
-from typing import Dict, List, Optional
 
 from utils.config import DATA_CACHE
 from utils.utils import period_to_timedelta
+
+log = logging.getLogger("traderplusplus")
 
 
 def _make_cache_key(*args, **kwargs) -> str:
@@ -57,14 +60,15 @@ def load_price_data(ticker: str, end_date: str,
     if use_cache and os.path.exists(cache_path) and not force_refresh:
         try:
             return pd.read_parquet(cache_path)
-        except Exception:
-            print(f"⚠️ Cache corrupted at {cache_path}, refetching...")
+        except (OSError, ValueError) as exc:
+            # Corrupt/unreadable cache file — log and recover by refetching, never silently.
+            log.warning("Cache unreadable at %s (%s); refetching.", cache_path, exc)
 
     df = _fetch_data(ticker, start_date, end_date, interval, source)
 
-    try:
+    if df.index.tz is None:
         df.index = df.index.tz_localize("UTC")
-    except:
+    else:
         df.index = df.index.tz_convert("UTC")
 
     if df.empty or "Close" not in df.columns:

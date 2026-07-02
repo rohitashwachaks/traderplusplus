@@ -152,6 +152,35 @@ def _fetch_data(ticker, start_date, end_date, interval, source):
         return fetch_custom_data(ticker, start_date, end_date, interval)
 ```
 
+## 🧱 From OHLCV to the DataContext
+
+The OHLCV fetchers above are the *raw* layer. Strategies don't read them directly — they read a
+**`DataContext`** assembled by `core/context.build_context()`. Two pieces sit in between:
+
+- **`core/sources.py` — `PanelSource` registry.** Each source produces one named `dates × tickers` panel and
+  registers under that name. `PriceSource` wraps the OHLCV fetchers above to serve the `price` panel;
+  `core/fundamentals.EpsSource` serves the `eps` panel from SEC EDGAR. Add a source → it's available as
+  `ctx.panel("name")` with **zero strategy changes**.
+- **`core/context.py` — `DataContext`.** One object exposing `ctx.price`, `ctx.members` (the membership mask),
+  `ctx.meta` (sector/SIC), and `ctx.fundamental(name)`. `build_context` outer-joins the universe (names with
+  staggered listing histories are kept as NaN, not dropped), sets `members = membership & price.notna()` (a
+  name is only held when it actually traded), and forward-fills feature panels from their availability date —
+  **point-in-time, no look-ahead.**
+
+### Universe (`core/universe.py`)
+
+`SP500` reads constituents from `data/sp500.csv` (paste them in; a committed file is deterministic). It is
+**survivorship-biased** (today's members, all-`True` mask) and stamps every report accordingly. `ListUniverse`
+wraps an explicit ticker list the same way.
+
+### Point-in-time fundamentals: SEC EDGAR (`data_ingestion/edgar_fetcher.py`, `core/fundamentals.py`)
+
+Fundamentals come **only** from SEC EDGAR, keyed to each value's **`filed`** date so a backtest sees only what
+was public then. `edgar_fetcher` maps ticker→CIK and pulls cached `companyconcept` facts (descriptive
+User-Agent, polite rate limit, 404 cached as empty, other HTTP errors raise). `fundamentals.annual_eps_series`
+keeps full-year diluted EPS **as-first-filed** (restatements ignored); `EpsSource` exposes it as the `eps`
+panel. A strategy opts in via `requires = ("eps",)`. See `docs/03-research-platform.md`.
+
 ## 🎯 Best Practices
 
 1. **Use Caching**: Always enable for faster development
@@ -179,15 +208,16 @@ rm -rf ./data_cache
 
 ## 📚 Related Documentation
 
+- [Direction & Roadmap](./00-direction.md)
 - [Getting Started](./02-getting-started.md)
-- [Core Components](./03-core-components.md)
-- [Strategy Development](./05-strategies.md)
-- [API Reference](./11-api-reference.md)
+- [Research Platform](./03-research-platform.md) — DataContext, universe, point-in-time fundamentals
+- [Backlog & Open Decisions](./04-backlog.md)
 
 ---
 
 **Code References**:
-- [`core/data_loader.py`](../core/data_loader.py)
-- [`data_ingestion/yahoo_fetcher.py`](../data_ingestion/yahoo_fetcher.py)
-- [`data_ingestion/alpaca_fetcher.py`](../data_ingestion/alpaca_fetcher.py)
-- [`data_ingestion/polygon_fetcher.py`](../data_ingestion/polygon_fetcher.py)
+
+- [`core/data_loader.py`](../core/data_loader.py) — fetch dispatch + parquet cache
+- [`core/sources.py`](../core/sources.py), [`core/context.py`](../core/context.py) — PanelSource registry + DataContext
+- [`core/universe.py`](../core/universe.py), [`core/fundamentals.py`](../core/fundamentals.py) — universe + point-in-time EPS
+- [`data_ingestion/`](../data_ingestion/) — `yahoo_fetcher.py`, `alpaca_fetcher.py`, `polygon_fetcher.py`, `edgar_fetcher.py`

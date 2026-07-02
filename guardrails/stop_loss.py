@@ -25,13 +25,17 @@ class StopLoss(Guardrail):
         self.trailing = trailing
 
     def apply(self, prices: pd.DataFrame, weights: pd.DataFrame) -> pd.DataFrame:
-        prices = prices.reindex(weights.index)
-        keep = pd.DataFrame(1.0, index=weights.index, columns=weights.columns)
+        # Do NOT reindex prices — we need the full daily history to detect intramonth crashes.
+        # The stop-loss logic runs on daily prices, but we only return adjusted weights at the
+        # dates where the strategy defined them.
+        keep = pd.DataFrame(1.0, index=prices.index, columns=weights.columns)
         for ticker in weights.columns:
-            keep[ticker] = self._keep(prices[ticker].to_numpy(), weights[ticker].to_numpy() > 0)
+            keep[ticker] = self._keep(prices[ticker].to_numpy(),
+                                       weights.reindex(prices.index).fillna(0.0)[ticker].to_numpy() > 0)
         # The breach is seen at close t; the exit lands on t+1 — no look-ahead.
         keep = keep.shift(1).fillna(1.0)
-        return weights * keep
+        # Return adjusted weights, reindexed back to the strategy's weight dates.
+        return (weights.reindex(prices.index).fillna(0.0) * keep).reindex(weights.index)
 
     def _keep(self, price: np.ndarray, want: np.ndarray) -> np.ndarray:
         """Per-ticker 'allowed to hold' mask in as-of-close-``t`` terms (shifted by the

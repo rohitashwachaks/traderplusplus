@@ -32,13 +32,24 @@ We **retired the hand-rolled backtest engine** and stand on proven libraries. Se
 
 ## Current state
 
-The pipeline runs end-to-end: **data → price panel → strategy weights → `bt` → reports**.
+The pipeline runs end-to-end: **data → `DataContext` → strategy weights → `bt` → reports**, universe-first and
+point-in-time. See `docs/03-research-platform.md` for the design.
 
-- `core/price_panel.py` — adapts the per-ticker OHLCV dict into a tz-naive close-price panel for `bt`.
-- `strategies/` — `TargetWeightStrategy` interface + registry (`base.py`), with `buy_n_hold`, `momentum`
-  (single-name SMA crossover) and `xs_momentum` (cross-sectional: rank a basket, hold the top names
-  equal-weighted, reconstituted monthly). All apply a one-bar `.shift(1)` so signals never look ahead. Each
-  strategy carries a `rebalance_freq` and `reconstitution_freq` (default daily) — see `engine/frequency.py`.
+- `core/sources.py` + `core/context.py` — a `PanelSource` registry (price now, EDGAR `eps` too) behind a
+  single `DataContext` (`ctx.price`, `ctx.members`, `ctx.meta`, `ctx.fundamental(name)`). `build_context`
+  outer-joins the universe (staggered listings kept as NaN), sets `members = membership & price.notna()`, and
+  forward-fills fundamentals from their filing date — point-in-time, no look-ahead.
+- `core/universe.py` — the tradable set: `SP500` (from `data/sp500.csv`, labeled survivorship-biased) and
+  `ListUniverse` for explicit tickers, each with a membership mask.
+- `core/fundamentals.py` + `data_ingestion/edgar_fetcher.py` — SEC EDGAR annual diluted EPS, **as-first-filed**,
+  exposed as the `eps` panel (the first point-in-time fundamental).
+- `strategies/` — `TargetWeightStrategy` interface + registry (`base.py`), reading a `DataContext` via
+  `weights(ctx)`: `buy_n_hold`, `momentum` (single-asset SMA crossover, swept across a universe),
+  `xs_momentum` (cross-sectional, monthly), `dual_momentum` (short-vs-long *rate*), and `ls_pe` (dollar-neutral
+  long/short on point-in-time P/E, `requires=("eps",)`). All apply a one-bar `.shift(1)`; each carries a
+  `rebalance_freq`/`reconstitution_freq` (see `engine/frequency.py`).
+- `research/` — `sweep.py` runs a single-asset rule independently across a universe; `report.py` writes the
+  alpha/beta **distribution** (per-name CSV + interactive chart) — the antidote to single-ticker selection bias.
 - `guardrails/` — `Guardrail` interface + registry (`base.py`); `stop_loss.py` is a configurable
   trailing/fixed stop that overlays the weights (daily close-to-close, no look-ahead, exits to cash).
 - `engine/runner.py` — applies guardrails, reconstitution sampling and the rebalance Run-algo to the strategy
