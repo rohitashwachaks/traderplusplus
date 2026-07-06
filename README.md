@@ -14,7 +14,9 @@
 >
 > Existing tools? Clunky. Proprietary. Not programmable enough.
 >
-> So I built it — for myself first. Now, it’s for every quant who thinks like a developer.
+> So I built it — for myself. This is a **personal instrument**, not a product: no roadmap
+> bends toward customers, monetization, or feature parity with platforms. It bends toward
+> one thing — results I can trust with my own money.
 
 ---
 
@@ -126,18 +128,21 @@ not change a past weight). That test is the credibility gate — see `AGENT.md`.
 ## 🏗️ Project structure
 
 ```text
-data_ingestion/   provider fetchers (yahoo, polygon, alpaca) + edgar_fetcher.py (SEC XBRL, filed dates)
-core/             data_loader (parquet cache) · price_panel · sources (PanelSource registry) ·
-                  context (DataContext) · universe (SP500, membership) · fundamentals (point-in-time EPS)
-data/sp500.csv    pasted S&P 500 constituents (committed input)
-strategies/       base (registry, weights(ctx)) + buy_n_hold · momentum · xs_momentum · dual_momentum · ls_pe
+data_ingestion/   provider fetchers (yahoo, polygon, alpaca) + edgar_fetcher.py (SEC XBRL: concepts,
+                  full 10-K/10-Q company facts, submissions/SIC — all keyed to filed dates)
+core/             store (canonical additive price store) · data_loader (legacy intraday cache) ·
+                  price_panel · sources (PanelSource registry) · context (DataContext) ·
+                  universe (SP500, membership) · fundamentals (PIT EPS/TTM/shares/SIC)
+data/sp500.csv    pasted S&P 500 constituents incl. CIK (committed input)
+strategies/       base (registry, weights(ctx), attachable guardrails) + buy_n_hold · momentum ·
+                  xs_momentum · dual_momentum · ls_pe
 guardrails/       base (registry) + stop_loss — risk overlays on weights
-engine/           runner (bt backtest + benchmark) · frequency · paper (rebalance plan)
+engine/           runner (bt backtest + costs + benchmark) · frequency · paper (plan + reconcile) · journal
 research/         sweep (single-asset across a universe) + report (alpha/beta distribution)
-reporting/        report (CSVs, PNGs, quantstats tearsheet) · interactive (plotly equity explorer)
+reporting/        report (stamped CSVs, PNGs, tearsheet) · interactive (equity explorer) · manifest
 brokers/          base (Broker port) · alpaca (paper, REST)
 run.py            backtest CLI      sweep.py  universe-sweep CLI      paper_trade.py  paper-rebalance CLI
-tests/            no-look-ahead + smoke + guardrail/frequency/paper + data-layer + sweep + fundamentals
+tests/            no-look-ahead + golden-file + store + costs + EDGAR PIT + journal/reconcile + more
 ```
 
 ---
@@ -147,14 +152,17 @@ tests/            no-look-ahead + smoke + guardrail/frequency/paper + data-layer
 | Area | Status | Notes |
 |------|--------|-------|
 | Engine on `bt` + metrics | ✅ | Rebalancing backtests; `ffn`/`quantstats` own Sharpe/alpha/beta/drawdown. |
-| Strategy framework | ✅ | `TargetWeightStrategy` registry, `weights(ctx)`, 5 built-in strategies. |
+| Trust rails | ✅ | Run manifest + bias stamps in every artifact, golden-file test, CI, data-quality checks. |
+| Canonical price store | ✅ | Additive per-ticker parquet + gap-only fetching (`core/store.py`); re-runs download nothing. |
+| Trading costs | ✅ | `--cost-bps` commission/slippage hook + turnover report; `0` (default) is stamped frictionless. |
+| Strategy framework | ✅ | `TargetWeightStrategy` registry, `weights(ctx)`, attachable guardrails, 5 built-in strategies. |
 | Pluggable data layer | ✅ | `PanelSource` registry, `DataContext`, SP500 universe + membership mask. |
-| Point-in-time fundamentals | ✅ v1 | SEC EDGAR annual EPS (as-first-filed); `ls_pe` long/short. TTM/market-cap next. |
+| Point-in-time fundamentals | ✅ | EDGAR as-first-filed: annual + TTM EPS, shares (→ market cap), SIC, full 10-K/10-Q facts ingest. |
 | Universe sweep + distribution | ✅ | Per-name alpha/beta across a universe; interactive chart. |
-| Guardrails / risk | ◑ | Stop-loss done; vol targeting / position caps planned. |
-| Paper trading | ◑ | Alpaca paper rebalance (preview by default, `--execute`); scheduling + reconciliation pending. |
-| Survivorship-free universe | ✗ | Universe is today's members (labeled biased). Real historical membership planned. |
-| Live trading / dashboard / ML | ✗ | Future phases. |
+| Guardrails / risk | ◑ | Stop-loss done, strategy-attached; vol targeting / position caps planned. |
+| Paper trading | ◑ | Alpaca paper rebalance + order journal + fill reconciliation (`--reconcile`); drift monitor pending. |
+| Survivorship-free universe | ✗ | Universe is today's members (labeled biased). Blocked on a delisted-inclusive data source (roadmap M4). |
+| Live paper / monitoring | ✗ | Future phase (roadmap M7). |
 
 Planned work, ideas, and open decisions live in **[`docs/04-backlog.md`](docs/04-backlog.md)**.
 

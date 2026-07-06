@@ -58,9 +58,21 @@ point-in-time. See `docs/03-research-platform.md` for the design.
 - `reporting/` — `report.py` writes CSVs (equity curve, daily returns, `bt` stats, quantstats metrics), PNGs,
   and a quantstats tearsheet; `interactive.py` writes a plotly equity explorer (underlying prices, buy/sell
   markers, per-day portfolio split on hover). Flat/all-cash curves skip the regression metrics with a warning.
+- `core/store.py` — the **canonical price store**: one additive parquet series per ticker + a coverage index;
+  `ensure()` fetches only the gap between what's stored and what a run needs. Re-running downloads nothing;
+  daily prices are served from here (the MD5 request cache remains for intraday only).
+- **Trust rails** — `reporting/manifest.py` writes a `manifest.json` (git SHA, args, universe fingerprint,
+  bias stamps) into every output dir; every CSV/HTML artifact carries its bias stamps; a golden-file test pins
+  a backtest's equity curve against silent drift; CI runs the suite on push.
+- **Costs** — `--cost-bps` charges commission+slippage per trade through `bt`'s commissions hook; turnover is
+  reported. The default `0` is a deliberate decision (small book, liquid large/mid caps) and is **stamped**
+  "frictionless" rather than hidden.
+- `engine/journal.py` + `paper_trade.py --reconcile` — every paper plan/execution appends to an append-only
+  journal; reconciliation diffs the broker's fills against the plan (slippage in bps, missing/unplanned
+  flagged). Ops guide (launchd scheduling, no server): `docs/05-paper-trading.md`.
 - `run.py` — CLI: `python run.py --strategy=momentum --tickers=AAPL --benchmark=SPY --start=… --end=…`.
-- `tests/` — a no-look-ahead test (truncating the future can't change a past weight) and an end-to-end smoke
-  test. Both network-free.
+- `tests/` — no-look-ahead, golden-file, store, costs, EDGAR point-in-time, journal/reconcile, smoke — all
+  network-free.
 
 The **entire legacy engine cluster was deleted** (old CLIs, `core/backtester.py`, `market_data.py`,
 `visualizer.py`, `executors/`, `analytics/`, `contracts/`, `guardrails/`, `brokers/`, old `strategies/*`,
@@ -90,6 +102,9 @@ non-negotiable 6 ("a backtest must be valid as an experiment, not just as code")
 
 ## Roadmap
 
+The step-by-step execution plan — milestones with exit criteria and gap analysis — lives in
+`docs/01-roadmap.md`. The coarse phases:
+
 - [x] **0. Lock the baseline.** Captured the old engine's behaviour before replacing it.
 - [x] **1. Engine spike.** `bt` stood up on `buy_n_hold`/`momentum` fed by the existing data layer, with reports.
 - [~] **2. Strategy + research platform.** `xs_momentum` delivers the real multi-ticker, cross-sectional,
@@ -97,26 +112,24 @@ non-negotiable 6 ("a backtest must be valid as an experiment, not just as code")
       research platform** (`docs/03-research-platform.md`, phases A–E): the `weights(ctx)` migration, a
       labeled-biased S&P 500 universe, EDGAR point-in-time fundamentals, and the research/compare-sweep bed
       (which subsumes the old "Portfolio comparison view").
-- [~] **3. Trust, tests & risk.** No-look-ahead + smoke tests exist; a configurable stop-loss guardrail
-      (trailing/fixed) is in and tested. Still to do: return-reproducibility/golden files, more guardrails
-      (max-drawdown, position caps), and CI.
+- [~] **3. Trust, tests & risk.** No-look-ahead + smoke tests, stop-loss guardrail, **golden-file
+      reproducibility test, CI, run manifests + bias-stamped artifacts, trading-cost hook** — all in. Still
+      to do: more guardrails (max-drawdown, position caps, vol targeting — roadmap M5).
 - [~] **4. Automated paper trading.** `paper_trade.py` recomputes the current target weights (same strategy/
       guardrail/frequency config), diffs them against live Alpaca **paper** positions via a thin broker port
-      (`brokers/`), and previews the orders; `--execute` submits them. Still to do: scheduling, fill
-      reconciliation against backtest expectations.
+      (`brokers/`), previews or executes, **journals every plan, and reconciles fills against the plan**
+      (`--reconcile`, slippage in bps). Scheduling is documented (launchd — `docs/05-paper-trading.md`).
+      Still to do: drift monitor (paper equity vs backtest expectation) + alerting.
 - [ ] **5. Live paper / hardening.** Promote to live paper; add monitoring, alerting, failure handling.
 
 ## Immediate next steps
 
-Driven by `docs/03-research-platform.md` (phase letters below):
-
-1. **Phase A — `weights(ctx)` migration.** Introduce the `DataContext` keystone and migrate the existing
-   strategies onto it (price-only context, `members` all-`True`). Behavior-preserving; existing tests stay green.
-2. **Phase B — universe + research bed (price only).** Labeled-biased S&P 500 universe so momentum / xs_momentum
-   are tested cross-sectionally (the selection-bias fix), plus the compare/sweep research bed with bias-stamped
-   reports (subsumes the old "Portfolio comparison view").
-3. **Phase C — EDGAR point-in-time fundamentals.** The PIT store + `ctx.fundamental("pe")` + the `ls_pe`
-   long/short strategy + a fundamentals no-look-ahead test — the first trustworthy fundamental backtest.
+Driven by `docs/01-roadmap.md` (milestones): the **M2 compare bed** (multi-strategy comparison — currently
+held, design sketched in the roadmap), the **M4 survivorship decision spike** (pick the delisted-inclusive
+data source; membership must be true point-in-time — a name selected one quarter and dropped at the next
+reconstitution has to enter and leave `ctx.members` on those dates), and the **M5 risk layer** (more
+guardrails, now trivially attachable per strategy). The universe also generalizes beyond equities: commodities
+/ gold / oil exposure via exchange-traded products under the same membership seam (see roadmap M4 note).
 
 ## Feasibility
 

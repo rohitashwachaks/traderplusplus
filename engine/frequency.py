@@ -35,6 +35,31 @@ def run_algo(freq: str) -> bt.Algo:
     return _RUN[normalize(freq)]()
 
 
+class RunOnDays(bt.Algo):
+    """Fire on an explicit set of dates — the engine's seam for guardrail exits, which must
+    trade the day they happen rather than wait for the scheduled rebalance."""
+
+    def __init__(self, days: pd.DatetimeIndex):
+        super().__init__()
+        self._days = set(pd.DatetimeIndex(days))
+
+    def __call__(self, target) -> bool:
+        return target.now in self._days
+
+
+class AnyOf(bt.Algo):
+    """True if any child algo fires. Every child is evaluated (no short-circuit), so
+    stateful Run algos keep their internal date tracking consistent."""
+
+    def __init__(self, algos: list[bt.Algo]):
+        super().__init__()
+        self._algos = algos
+
+    def __call__(self, target) -> bool:
+        results = [algo(target) for algo in self._algos]
+        return any(results)
+
+
 def resample_reconstitution(weights: pd.DataFrame, freq: str) -> pd.DataFrame:
     """Refresh target weights only on each period boundary, holding them constant in
     between — i.e. reconstitute the selection/weights every `freq` and let `bt` rebalance

@@ -23,3 +23,12 @@ class Broker(ABC):
     def submit(self, ticker: str, qty: int, side: str) -> None:
         """Submit a market order. ``side`` is ``"buy"`` or ``"sell"``."""
         ...
+
+    def orders(self, since: str) -> list[dict]:
+        """Order history since an ISO timestamp, for fill reconciliation.
+
+        Each dict carries at least ``symbol, side, qty, filled_qty, filled_avg_price,
+        status``. Optional because only reconciliation needs it — a broker without it
+        still trades, it just can't be audited.
+        """
+        raise NotImplementedError(f"{type(self).__name__} does not expose order history")

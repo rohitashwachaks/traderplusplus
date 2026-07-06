@@ -53,6 +53,7 @@ class TargetWeightStrategy(ABC):
     reconstitution_freq: str = "D"
     single_asset: bool = False
     requires: tuple[str, ...] = ()  # context panels beyond price/members, e.g. ("eps",)
+    guardrails: tuple = ()  # risk overlays that ship *with* the strategy, applied before any CLI ones
 
     @abstractmethod
     def weights(self, ctx: DataContext) -> pd.DataFrame:

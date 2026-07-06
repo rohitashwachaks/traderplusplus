@@ -47,19 +47,52 @@ class PanelSource(ABC):
         ...
 
 
-class PriceSource(PanelSource):
-    """Close-price panel from the existing cached data layer (yahoo/polygon/alpaca)."""
+class _OhlcvFieldSource(PanelSource):
+    """One OHLCV field as a panel, served from the canonical :class:`~core.store.PriceStore`.
 
-    name = "price"
+    Daily bars go through the store (gap-only fetching, one additive copy per ticker); any
+    other interval falls back to the legacy per-request cache, since the store is
+    deliberately daily-only.
+    """
+
+    field: str
 
     def load(self, tickers: list[str], start: str, end: str, **opts) -> pd.DataFrame:
         source = opts.get("source", "yahoo")
         interval = opts.get("interval", "1d")
         how = opts.get("how", "inner")
-        data = DataIngestionManager(source=source).get_data(
-            tickers, end_date=end, start_date=start, interval=interval
-        )
-        return to_price_panel(data, how=how)
+        if interval != "1d":
+            data = DataIngestionManager(source=source).get_data(
+                tickers, end_date=end, start_date=start, interval=interval
+            )
+            return to_price_panel(data, field=self.field, how=how)
+
+        from core.store import PriceStore
+
+        store = PriceStore()
+        store.ensure(tickers, start, end, source=source)
+        return to_price_panel(store.load(tickers, start, end), field=self.field, how=how)
+
+
+class PriceSource(_OhlcvFieldSource):
+    name = "price"
+    field = "Close"
+
+
+class HighSource(_OhlcvFieldSource):
+    """Intraday highs — lets guardrails trail a stop off the real peak, not just closes."""
+
+    name = "high"
+    field = "High"
+
+
+class LowSource(_OhlcvFieldSource):
+    """Intraday lows — lets guardrails detect a stop being touched, not just crossed at close."""
+
+    name = "low"
+    field = "Low"
 
 
 register_source(PriceSource())
+register_source(HighSource())
+register_source(LowSource())

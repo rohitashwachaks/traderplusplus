@@ -45,3 +45,17 @@ class AlpacaBroker(Broker):
         if not resp.ok:
             raise RuntimeError(f"Alpaca order {side} {qty} {ticker} failed "
                                f"[{resp.status_code}]: {resp.text}")
+
+    def orders(self, since: str) -> list[dict]:
+        resp = self._session.get(f"{self._base}/v2/orders", timeout=30, params={
+            "status": "all", "after": since, "limit": 500, "direction": "asc",
+        })
+        if not resp.ok:
+            raise RuntimeError(f"Alpaca GET orders failed [{resp.status_code}]: {resp.text}")
+        return [
+            {"symbol": o["symbol"], "side": o["side"], "qty": float(o["qty"] or 0),
+             "filled_qty": float(o["filled_qty"] or 0),
+             "filled_avg_price": float(o["filled_avg_price"] or 0),
+             "status": o["status"], "submitted_at": o["submitted_at"]}
+            for o in resp.json()
+        ]

@@ -9,6 +9,9 @@ A **trustworthy personal research backtester**, evolving toward automated paper 
 The animating principle, from the README, is *"a tool that doesn't lie to me."* Correctness is the
 product. A backtest that is fast, pretty, and subtly wrong is worse than useless — it loses real money.
 
+This is a **personal instrument, not a product**: no customers, no monetization, no feature-parity
+chasing. Decisions optimize for the owner's trust in his own results.
+
 Constraints that shape every decision:
 
 - **Horizon:** no intraday/HFT. Positions held ~1 day to 6 months → **daily bars** are the unit of time.
@@ -103,27 +106,30 @@ You are penalized for every useless line. Write the minimum code that is correct
 
 ```text
 data_ingestion/      provider fetchers (yahoo, polygon, alpaca) — KEEP
-core/data_loader.py  parquet cache (MD5 key per ticker/range/interval/source) — KEEP
-core/price_panel.py  OHLCV dict → tz-naive close panel for bt
-core/sources.py      PanelSource registry (price, eps) — pluggable data behind the context
+core/store.py        canonical price store: additive per-ticker parquet + coverage.json, gap-only fetching (daily bars)
+core/data_loader.py  legacy request cache (MD5 key) — intraday only; daily prices go through the store
+core/price_panel.py  OHLCV dict → tz-naive close panel for bt (+ data-quality gate: dupes raise, bad prices nulled loudly)
+core/sources.py      PanelSource registry (price, eps, eps_ttm, shares) — pluggable data behind the context
 core/context.py      DataContext: price · members · meta · fundamental(name) — the single strategy input; build_context outer-joins + ffills feature panels (point-in-time)
-core/universe.py     Universe (ListUniverse, SP500 from data/sp500.csv) + point-in-time membership mask
-core/fundamentals.py annual_eps_series (as-first-filed) + EpsSource (point-in-time EPS panel)
-data_ingestion/edgar_fetcher.py  SEC EDGAR: ticker→CIK map + cached companyconcept facts (filed dates)
-data/sp500.csv       pasted S&P 500 constituents (Symbol[, GICS Sector, GICS Sub-Industry]) — committed input
-strategies/          base.py (TargetWeightStrategy + registry, freq, single_asset, requires), buy_n_hold.py, momentum.py (single-asset), cross_sectional_momentum.py (xs_momentum), dual_window_momentum.py (dual_momentum), long_short_pe.py (ls_pe, requires eps)
+core/universe.py     Universe (ListUniverse, SP500 from data/sp500.csv) + membership mask + fingerprint (for manifests)
+core/fundamentals.py PIT panels, all as-first-filed & filed-date keyed: annual EPS · TTM EPS (Q4 from the 10-K) · shares (mcap = price × shares) · sic_meta
+data_ingestion/edgar_fetcher.py  SEC EDGAR: ticker→CIK (SEC map + committed-CSV overlay), companyconcept, companyfacts (full 10-K/10-Q line items), submissions (SIC)
+data/sp500.csv       pasted S&P 500 constituents incl. CIK — committed input
+strategies/          base.py (TargetWeightStrategy + registry, freq, single_asset, requires, attachable guardrails), buy_n_hold.py, momentum.py (single-asset), cross_sectional_momentum.py (xs_momentum), dual_window_momentum.py (dual_momentum), long_short_pe.py (ls_pe, requires eps)
 guardrails/          base.py (Guardrail + registry), stop_loss.py — risk overlays on weights
 research/            sweep.py (single-asset rule across a universe → per-name alpha/beta), report.py (distribution chart)
-engine/runner.py     builds & runs the bt backtest (+ benchmark), applies guardrails + frequencies
-engine/frequency.py  rebalance Run-algo + reconstitution resampling helpers
-reporting/report.py  CSVs, PNGs, quantstats tearsheet
-reporting/interactive.py  plotly equity explorer (holdings split on hover, buy/sell markers)
-engine/paper.py      rebalance plan: diff target weights vs broker positions → orders
-brokers/             base.py (Broker port), alpaca.py (paper, REST via requests)
+engine/runner.py     builds & runs the bt backtest (+ benchmark), applies guardrails + frequencies + cost_bps commissions
+engine/frequency.py  rebalance Run-algo + reconstitution resampling + RunOnDays/AnyOf (guardrail exits trade immediately)
+engine/paper.py      rebalance plan (diff targets vs positions → orders) + fill reconciliation (slippage in bps)
+engine/journal.py    append-only JSONL journal of every paper plan / execution / reconciliation
+reporting/report.py  bias-stamped CSVs (+ turnover), PNGs, quantstats tearsheet
+reporting/interactive.py  plotly equity explorer (holdings split on hover, buy/sell markers, caveat in title)
+reporting/manifest.py  manifest.json per output dir: git SHA, args, universe fingerprint, bias stamps
+brokers/             base.py (Broker port incl. order history), alpaca.py (paper, REST via requests)
 run.py               backtest CLI entry point (--tickers or --universe; single-asset strategies redirect to sweep)
 sweep.py             universe-sweep CLI: run a single-asset strategy on every name → alpha/beta distribution
-paper_trade.py       paper-rebalance CLI (preview by default; --execute to submit)
-tests/               no-look-ahead + smoke + guardrail/frequency/paper + data-layer + sweep (network-free)
+paper_trade.py       paper-rebalance CLI (preview by default; --execute to submit; --reconcile to audit fills)
+tests/               no-look-ahead + golden-file + store + costs + EDGAR PIT + journal/reconcile + smoke (network-free)
 ```
 
 Strategies receive a `DataContext` (`weights(ctx)`), never a raw price frame, and only hold names where
@@ -133,7 +139,8 @@ trading calendar. A *single-asset* strategy (e.g. `momentum`) is validated by **
 one name at a time and reading the distribution of alpha/beta — not by pooling names into a basket.
 
 Point-in-time fundamentals come **only** from SEC EDGAR (each value keyed to its `filed` date,
-as-first-filed). EPS lands now; market-cap / sector (SIC) and TTM EPS are the next EDGAR additions.
+as-first-filed): annual EPS, TTM EPS, shares outstanding (→ market cap), SIC, and the full 10-K/10-Q
+line-item history via `fetch_company_facts` — the seam new fundamental panels are built from.
 
 ## Working in this repo
 

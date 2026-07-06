@@ -9,6 +9,7 @@ all-``True`` membership mask. That bias is real and must be stamped on any repor
 (see ``stamp``). A historical-membership feed later fills the same mask with real values, and no
 strategy changes — they already read ``ctx.members``.
 """
+import hashlib
 import os
 from abc import ABC, abstractmethod
 
@@ -42,6 +43,10 @@ class Universe(ABC):
         """A one-line bias caveat for reports, or ``None`` if the universe is unbiased."""
         if self.biased:
             return f"universe '{self.name}' is survivorship-biased (today's members, all-in mask) — indicative only"
+        return None
+
+    def fingerprint(self) -> str | None:
+        """A hash of the universe's defining input (for run manifests), or ``None``."""
         return None
 
 
@@ -103,6 +108,10 @@ class SP500(Universe):
 
     def meta(self) -> pd.DataFrame:
         return self._table()
+
+    def fingerprint(self) -> str | None:
+        with open(self._path, "rb") as fh:
+            return hashlib.md5(fh.read()).hexdigest()
 
 
 _UNIVERSES = {"sp500": SP500}

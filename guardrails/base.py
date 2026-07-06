@@ -28,13 +28,23 @@ class Guardrail(ABC):
 
     A guardrail rewrites the weights a strategy proposes — it may only *reduce* exposure
     (push a weight toward 0), never increase it. Guardrails compose: the engine applies a
-    list of them in order. Like strategies, a guardrail must be **no look-ahead** — the
-    adjusted weight on day ``t`` may depend only on prices through ``t-1``.
+    list of them in order, **after** reconstitution sampling, and any change a guardrail
+    makes trades immediately — a risk exit never waits for the next scheduled rebalance.
+
+    Like strategies, a guardrail must be **no look-ahead**: the adjusted weight on day
+    ``t`` may use information only through day ``t`` (intraday high/low of ``t`` included —
+    they precede or coincide with ``t``'s close, where the exit fills).
     """
 
     name: str
+    requires: tuple[str, ...] = ()  # extra panels beyond close, e.g. ("high", "low")
 
     @abstractmethod
-    def apply(self, prices: pd.DataFrame, weights: pd.DataFrame) -> pd.DataFrame:
-        """Return adjusted target weights, same shape/index as ``weights``."""
+    def apply(self, prices: pd.DataFrame, weights: pd.DataFrame, **panels) -> pd.DataFrame:
+        """Return adjusted target weights, same shape/index as ``weights``.
+
+        ``panels`` carries the guardrail's ``requires`` panels when the context has them
+        (e.g. ``high=`` / ``low=``); a guardrail must degrade loudly-but-gracefully when
+        they are absent (sweeps and tests run on close-only data).
+        """
         ...

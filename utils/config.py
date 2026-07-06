@@ -7,6 +7,7 @@ LOG_DIR = os.path.join(OUTPUT_DIR, 'log')
 FIGURE_DIR = os.path.join(OUTPUT_DIR, 'figures')
 
 DATA_CACHE = os.environ.get('DATA_CACHE', './data_cache')
+DATA_STORE = os.environ.get('DATA_STORE', './data_store')
 POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY")
 
 ALPACA_API_KEY = os.environ.get("ALPACA_API_KEY")

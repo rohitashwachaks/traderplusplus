@@ -29,6 +29,7 @@ def sweep_universe(
     source: str = "yahoo",
     interval: str = "1d",
     guardrails: Sequence[Guardrail] | None = None,
+    cost_bps: float = 0.0,
     min_days: int = 60,
     price_loader: Callable[[str], pd.DataFrame] | None = None,
 ) -> pd.DataFrame:
@@ -45,6 +46,7 @@ def sweep_universe(
         start, end: date window.
         source, interval: data options for the default price loader.
         guardrails: optional risk overlays applied per name.
+        cost_bps: commission+slippage per trade in bps of notional (0 = frictionless).
         min_days: skip names with fewer than this many return observations.
         price_loader: override how a ticker's price panel is fetched (for tests).
 
@@ -75,7 +77,8 @@ def sweep_universe(
             log.warning("skip %s: %s", ticker, exc)
             continue
 
-        res = runner.run(strategy, DataContext.from_prices(panel), benchmark_prices, guardrails=guardrails)
+        res = runner.run(strategy, DataContext.from_prices(panel), benchmark_prices,
+                         guardrails=guardrails, cost_bps=cost_bps)
         equity = res.prices
         returns = equity[strategy.name].pct_change().dropna()
         bench = equity[bench_name].pct_change().dropna()

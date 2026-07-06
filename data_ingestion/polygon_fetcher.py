@@ -1,3 +1,6 @@
+import logging
+import time
+
 from polygon import RESTClient
 import pandas as pd
 
@@ -5,7 +8,8 @@ from utils.config import POLYGON_API_KEY
 from utils.utils import split_period
 
 from tenacity import retry, stop_after_attempt, wait_exponential
-import time
+
+log = logging.getLogger("traderplusplus")
 
 
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=5, max=300))
@@ -18,7 +22,7 @@ def fetch_with_retry(client, ticker, multiplier, timespan, start_date, end_date)
         )
         return polygon_response
     except Exception as e:
-        print(f"Error: {e}. Retrying...")
+        log.warning("Polygon fetch error for %s: %s — retrying", ticker, e)
         raise
 
 
@@ -26,11 +30,9 @@ def fetch_polygon_data_with_backoff(client, ticker, multiplier, timespan, start_
     while True:
         try:
             return fetch_with_retry(client, ticker, multiplier, timespan, start_date, end_date)
-        except Exception as e:
-            print(f"Rate limit hit. Waiting before retrying...")
-            for remaining in range(300, 0, -1):
-                print(f"Retrying in {remaining} seconds...", end="\r")
-                time.sleep(1)
+        except Exception:
+            log.warning("Polygon rate limit hit for %s; sleeping 300s before retrying", ticker)
+            time.sleep(300)
 
 
 def fetch_polygon_data(ticker: str, start_date: str, end_date: str, interval: str) -> pd.DataFrame:

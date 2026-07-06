@@ -34,16 +34,16 @@ def test_stop_loss_no_lookahead(choppy_prices):
 
 
 def test_trailing_stop_exits_and_latches():
-    """A 5% trailing stop exits the bar after price falls 5% from its peak, then stays
-    out (buy-and-hold keeps wanting in, but the stop is latched)."""
+    """A 5% trailing stop exits **the day** price touches 5% below its peak (same-day
+    close fill), then stays out (buy-and-hold keeps wanting in, but the stop is latched)."""
     weights = _w(BuyAndHold(), _RISE_FALL)
     adjusted = StopLoss(0.05, trailing=True).apply(_RISE_FALL, weights)["AAPL"]
 
     assert adjusted.iloc[3] == 1.0           # still fully invested during the run-up
-    assert adjusted.iloc[-1] == 0.0          # stopped out by the end
-    # Once it goes flat it never re-enters (no thrashing).
+    # Peak 110 → level 104.5; the close of 104 (day 8) breaches → out that same day.
     first_zero = np.argmax(adjusted.to_numpy() == 0.0)
-    assert (adjusted.iloc[first_zero:] == 0.0).all()
+    assert first_zero == 8
+    assert (adjusted.iloc[first_zero:] == 0.0).all()   # latched — no thrashing
 
 
 def test_stop_pct_is_configurable():
@@ -89,7 +89,7 @@ def test_stop_loss_catches_intramonth_crashes():
     adjusted = StopLoss(0.10, trailing=True).apply(prices_df, weights)["TEST"]
 
     # Verify: with full daily price visibility, stop loss detects the intramonth crash.
-    # Days 50-53: still holding (price still > 90% of peak)
-    # Day 54 onwards: stopped out (price fell 13% from peak)
-    assert (adjusted[50:54] == 1.0).all(), "should hold on days 50-53 (before breach)"
-    assert (adjusted[54:] == 0.0).all(), "should be stopped out from day 54 onward (breach on day 54)"
+    # Days 50-52: still holding (price above 90% of the 150 peak).
+    # Day 53 (price 135 = exactly −10%): breach → out at that day's close, and onward.
+    assert (adjusted[50:53] == 1.0).all(), "should hold on days 50-52 (before breach)"
+    assert (adjusted[53:] == 0.0).all(), "should be stopped out from day 53 (breach day) onward"

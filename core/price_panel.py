@@ -1,4 +1,8 @@
+import logging
+
 import pandas as pd
+
+log = logging.getLogger("traderplusplus")
 
 
 def to_price_panel(data: dict[str, pd.DataFrame], field: str = "Close", how: str = "inner") -> pd.DataFrame:
@@ -41,4 +45,31 @@ def to_price_panel(data: dict[str, pd.DataFrame], field: str = "Close", how: str
     panel = panel.dropna(how="all") if how == "outer" else panel.dropna(how="any")
     if panel.empty:
         raise ValueError("Price panel is empty after aligning tickers")
+    return _validated(panel)
+
+
+def _validated(panel: pd.DataFrame) -> pd.DataFrame:
+    """Data-quality gate: corrupt structure raises; suspect values are nulled *loudly*.
+
+    A data error that slips through here masquerades as alpha downstream, so nothing is
+    silently tolerated: duplicate dates are structural corruption (raise); non-positive
+    prices are vendor glitches (set to NaN with a named warning — the membership mask then
+    keeps the name untradable on those days); extreme one-day moves are flagged for a human.
+    """
+    if panel.index.duplicated().any():
+        dupes = panel.index[panel.index.duplicated()].unique()
+        raise ValueError(f"Price panel has duplicated dates (corrupt input): {list(dupes[:5])}")
+
+    bad = (panel <= 0)
+    if bad.any().any():
+        counts = bad.sum()
+        offenders = {t: int(n) for t, n in counts[counts > 0].items()}
+        log.warning("Non-positive prices nulled (vendor data error): %s", offenders)
+        panel = panel.where(~bad)
+
+    jumps = panel.pct_change().abs() > 0.5
+    if jumps.any().any():
+        counts = jumps.sum()
+        offenders = {t: int(n) for t, n in counts[counts > 0].items()}
+        log.warning(">50%% one-day moves — verify these are real, not data errors: %s", offenders)
     return panel

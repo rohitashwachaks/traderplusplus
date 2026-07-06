@@ -23,7 +23,13 @@ python run.py --strategy=momentum --tickers=AAPL --benchmark=SPY --start=2023-01
 
 Flags: `--strategy` (`buy_n_hold` | `momentum` | `xs_momentum` | `dual_momentum` | `ls_pe`), `--tickers` (comma-separated) **or**
 `--universe sp500` (with `--limit N` for quick runs), `--benchmark`, `--start`, `--end`, `--cash`, `--source`
-(`yahoo` | `polygon` | `alpaca`), `--interval`, `--out`. `xs_momentum` is cross-sectional momentum (rank a
+(`yahoo` | `polygon` | `alpaca`), `--interval`, `--out`, `--cost-bps` (commission+slippage per trade in bps of
+notional; `0` — the default — is frictionless and **stamped** as such on every artifact).
+
+Daily prices are served from the canonical store (`data_store/`): the first run fetches and ingests, every
+later run reads locally and fetches only new dates — re-running a backtest downloads nothing. Each output
+directory carries a `manifest.json` (git SHA, args, universe fingerprint, bias stamps) so any result folder is
+self-describing and re-derivable. `xs_momentum` is cross-sectional momentum (rank a
 basket by trailing return, hold the top names equal-weighted, monthly). `ls_pe` is a dollar-neutral long/short
 on **point-in-time P/E** (long cheapest, short richest) — it pulls annual EPS from SEC EDGAR, keyed to filing
 date, so give it a universe (e.g. `--universe sp500 --limit 50`).
@@ -48,15 +54,28 @@ strategy's defaults (both daily = trade whenever the signal changes). `--rebalan
 quarterly; `--reconstitute Y` recomputes the target (selection + weights) yearly and holds it constant in
 between. A strategy can also set these as class attributes (`rebalance_freq`, `reconstitution_freq`).
 
-**Risk guardrail (optional):** add `--stop-loss 0.05` for a 5% stop (configurable). It's trailing by default
-(stop measured from the peak since entry); use `--stop-loss-mode fixed` to stop from the entry price instead.
-Because we only have daily bars, a breach is detected on a day's close and the exit lands on the next close —
-no intraday or optimistic stop-price fills. A stopped ticker goes to cash and stays out until the strategy
-re-enters it.
+**Risk guardrail (optional):** add `--stop-loss 0.05` for a 5% stop (configurable). It's trailing by default;
+use `--stop-loss-mode fixed` to stop from the entry price instead. The stop models a resting stop order as
+faithfully as daily bars allow: the reference **trails the intraday high**, the stop **triggers the day the
+intraday low touches the level**, and the exit **fills at that same day's close** — immediately, even if the
+strategy rebalances monthly or quarterly (risk exits never wait for the schedule). Fill realism is stamped,
+not hidden: `bt` fills at closes, so a gap *through* the stop books the crash day's close (worse than a real
+stop fill — conservative), while a touch-and-recover day books the recovered close (slightly optimistic). A
+stopped ticker goes to cash and stays out until the strategy's own signal goes flat and re-fires — **or**, with
+`--stop-reentry N`, until N trading days pass and the signal still wants the name (the stop re-arms from the
+re-entry price). Use the cooldown with slow signals like SMA crossovers: a crash can trip the stop while the
+crossover never goes flat, and without re-entry the name would sit in cash through the whole recovery. The
+cost is symmetric: in a persistent decline the cooldown re-buys a falling name once every N days. The equity
+explorer draws the **active stop level** (dashed red) next to each held name, so you can see the intended
+exit against the actual one.
 
 ```bash
 python run.py --strategy=momentum --tickers=AAPL --benchmark=SPY --start=2022-01-01 --end=2024-01-01 --stop-loss=0.05
 ```
+
+A strategy can also **ship with guardrails attached** — set the `guardrails` attribute (a tuple of `Guardrail`
+instances) on the class or instance and they apply on every run, backtest and paper alike; CLI guardrails are
+added after them.
 
 Artifacts written to `--out`:
 
@@ -87,7 +106,9 @@ Artifacts written to `--out`:
 
 Subclass `TargetWeightStrategy`, read data through the `DataContext`, and return target weights. Apply any
 signal lag *inside* `weights()` so the strategy never looks ahead, and only hold names where `ctx.members` is
-true. Declare any non-price data via `requires` (e.g. `("eps",)`).
+true. Declare any non-price data via `requires` — available panels: `eps` (annual, as-first-filed), `eps_ttm`
+(trailing-twelve-month, Q4 reconstructed from the 10-K), `shares` (shares outstanding; market cap is
+`ctx.price * ctx.fundamental("shares")`).
 
 ```python
 # strategies/my_strategy.py
@@ -126,7 +147,11 @@ python paper_trade.py --strategy=momentum --tickers=AAPL,MSFT --stop-loss=0.05 -
 
 It reads `ALPACA_API_KEY` / `ALPACA_API_SECRET` from `.env`, talks to the REST API over `requests` (paper host
 only — asserted), sizes whole-share market orders against your account equity, and sells before buying so
-closing trades fund the openings. To automate, run it on a schedule (cron / `/schedule`) — there's no daemon.
+closing trades fund the openings. Every run — preview or executed — is appended to a JSONL **journal**
+(`output/paper/journal.jsonl`); after fills settle, `python paper_trade.py --reconcile` diffs the broker's
+actual orders against the last executed plan and reports per-order slippage in bps. Scheduling (launchd — no
+server needed), timing that matches the backtest's execution lag, and the full ops guide live in
+[`05-paper-trading.md`](./05-paper-trading.md).
 
 ## Test
 

@@ -91,65 +91,45 @@ ingestion = DataIngestionManager(source="polygon")
 **Pros**: Institutional quality, extensive coverage  
 **Cons**: Requires paid API key
 
-## 💾 Caching System
+## 💾 Storage — canonical store + legacy cache
 
-### Cache Location
+**Daily bars live in the canonical price store** (`./data_store/`, override via `DATA_STORE`):
+one additive parquet file per ticker plus `coverage.json` recording the calendar window each
+ticker already holds. `PriceStore.ensure()` fetches **only the gap** between what's stored and
+what a run needs — re-running any backtest downloads nothing, and widening the window fetches
+just the new dates. One vendor per ticker (mixing sources would let two runs silently
+disagree); `PriceStore().forget("AAPL")` drops a series for a clean refetch — useful because
+adjusted prices are retroactively restated by splits/dividends. See `core/store.py`.
 
-Default: `./data_cache/`
-
-Configure:
-```bash
-export DATA_CACHE="/path/to/cache"
-```
-
-### Cache Management
-
-**Force Refresh**:
-```python
-ingestion = DataIngestionManager(force_refresh=True)
-```
-
-**CLI**:
-```bash
-python run.py --refresh
-```
-
-**Clear Cache**:
-```bash
-rm -rf ./data_cache
-```
+**Intraday (non-`1d`) requests** still go through the legacy per-request MD5 cache
+(`./data_cache/`, override via `DATA_CACHE`) — intraday is out of the platform's scope, so it
+never earned a canonical store. EDGAR responses cache under `data_store/edgar/` and
+`data_cache/`. Everything is regenerable: deleting either directory just refetches.
 
 ## 🔧 Custom Data Sources
 
-### Step 1: Create Fetcher
+Two extension points, depending on what you're adding:
+
+**A new price vendor** (another OHLCV feed): write a fetcher returning the standard OHLCV
+frame and add a branch for it in `core/data_loader._fetch_data` — the store and every panel
+pick it up via `--source`.
+
+**A new kind of data** (a fundamental, a sentiment score, anything point-in-time): implement a
+`PanelSource` and register it — strategies opt in via `requires`, with zero engine changes:
 
 ```python
-# data_ingestion/custom_fetcher.py
-def fetch_custom_data(ticker, start_date, end_date, interval):
-    # Fetch from your source
-    data = your_api.get_data(ticker, start_date, end_date)
-    
-    # Convert to standard format
-    df = pd.DataFrame({
-        'Open': data['open'],
-        'High': data['high'],
-        'Low': data['low'],
-        'Close': data['close'],
-        'Volume': data['volume']
-    }, index=pd.to_datetime(data['timestamp']))
-    
-    df.index = df.index.tz_localize("UTC")
-    return df
-```
+# core/my_panel.py
+from core.sources import PanelSource, register_source
 
-### Step 2: Register in DataLoader
+class MySource(PanelSource):
+    name = "my_signal"                       # strategies declare requires=("my_signal",)
 
-```python
-# core/data_loader.py
-def _fetch_data(ticker, start_date, end_date, interval, source):
-    if source == "custom":
-        from data_ingestion.custom_fetcher import fetch_custom_data
-        return fetch_custom_data(ticker, start_date, end_date, interval)
+    def load(self, tickers, start, end, **opts) -> pd.DataFrame:
+        # sparse dates×tickers frame, each value indexed by the date it became PUBLIC;
+        # build_context forward-fills it onto the trading calendar (past-only, no look-ahead)
+        ...
+
+register_source(MySource())
 ```
 
 ## 🧱 From OHLCV to the DataContext
@@ -176,10 +156,23 @@ wraps an explicit ticker list the same way.
 ### Point-in-time fundamentals: SEC EDGAR (`data_ingestion/edgar_fetcher.py`, `core/fundamentals.py`)
 
 Fundamentals come **only** from SEC EDGAR, keyed to each value's **`filed`** date so a backtest sees only what
-was public then. `edgar_fetcher` maps ticker→CIK and pulls cached `companyconcept` facts (descriptive
-User-Agent, polite rate limit, 404 cached as empty, other HTTP errors raise). `fundamentals.annual_eps_series`
-keeps full-year diluted EPS **as-first-filed** (restatements ignored); `EpsSource` exposes it as the `eps`
-panel. A strategy opts in via `requires = ("eps",)`. See `docs/03-research-platform.md`.
+was public then. `edgar_fetcher` maps ticker→CIK (the SEC map overlaid with the `CIK` column committed in
+`data/sp500.csv` — no mismatch, no extra network) and pulls cached facts (descriptive User-Agent, polite rate
+limit, 404 cached as empty, other HTTP errors raise). What's available:
+
+- **`eps`** — annual diluted EPS, **as-first-filed** (restatements ignored), falling back to basic EPS when
+  diluted was never tagged.
+- **`eps_ttm`** — trailing-twelve-month EPS; the never-filed Q4 is reconstructed from the 10-K
+  (`Q4 = FY − Q1 − Q2 − Q3`) and placed on the 10-K's filing date — point-in-time by construction.
+- **`shares`** — common shares outstanding from every 10-K/10-Q cover; market cap is
+  `ctx.price * ctx.fundamental("shares")`.
+- **`fetch_company_facts(cik)`** — the *full* 10-K/10-Q line-item history (every XBRL concept: revenue, net
+  income, assets, …), one long frame indexed by `filed` date, cached to `data_store/edgar/`. The structured
+  ingest for financial statements; build new panels from it.
+- **`fetch_submissions(cik)` / `fundamentals.sic_meta(tickers)`** — SIC code + description per company, for
+  sector-neutral books and comparables.
+
+A strategy opts in via `requires = ("eps",)` (or `eps_ttm`, `shares`). See `docs/03-research-platform.md`.
 
 ## 🎯 Best Practices
 

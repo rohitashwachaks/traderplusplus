@@ -85,3 +85,53 @@ def execute_plan(broker: Broker, orders: list[Order]) -> None:
     for o in orders:
         broker.submit(o.ticker, o.qty, o.side)
         log.info("  submitted %s %d %s", o.side, o.qty, o.ticker)
+
+
+def reconcile(planned: list[dict], broker_orders: list[dict],
+              planned_prices: dict[str, float]) -> pd.DataFrame:
+    """Diff a journaled plan against the broker's actual orders and fills.
+
+    One row per (ticker, side): planned vs filled quantity, the plan's reference close vs
+    the actual average fill, and the signed slippage in bps (positive = the fill cost money
+    versus the price the backtest assumed — buys filled higher, sells filled lower). Broker
+    orders the plan doesn't contain come back with status ``unplanned`` — an order the
+    journal doesn't know about is a red flag, not a rounding error.
+
+    Args:
+        planned: order dicts from the journal (``ticker, side, qty``).
+        broker_orders: broker order history (``symbol, side, qty, filled_qty,
+            filled_avg_price, status``).
+        planned_prices: the close per ticker the plan was sized against.
+    """
+    fills: dict[tuple[str, str], dict[str, float]] = {}
+    for o in broker_orders:
+        key = (o["symbol"], o["side"])
+        agg = fills.setdefault(key, {"filled_qty": 0.0, "notional": 0.0})
+        agg["filled_qty"] += o["filled_qty"]
+        agg["notional"] += o["filled_qty"] * o["filled_avg_price"]
+
+    rows = []
+    for p in planned:
+        key = (p["ticker"], p["side"])
+        agg = fills.pop(key, None)
+        filled_qty = agg["filled_qty"] if agg else 0.0
+        fill_price = (agg["notional"] / agg["filled_qty"]) if agg and agg["filled_qty"] else float("nan")
+        ref = float(planned_prices.get(p["ticker"], float("nan")))
+        sign = 1.0 if p["side"] == "buy" else -1.0
+        slippage = sign * (fill_price / ref - 1.0) * 1e4 if filled_qty and ref > 0 else float("nan")
+        status = ("filled" if filled_qty >= p["qty"]
+                  else "partial" if filled_qty > 0 else "missing")
+        rows.append({"ticker": p["ticker"], "side": p["side"], "planned_qty": p["qty"],
+                     "filled_qty": filled_qty, "ref_price": ref, "fill_price": fill_price,
+                     "slippage_bps": slippage, "status": status})
+
+    for (symbol, side), agg in fills.items():
+        if agg["filled_qty"] == 0:
+            continue
+        rows.append({"ticker": symbol, "side": side, "planned_qty": 0,
+                     "filled_qty": agg["filled_qty"], "ref_price": float("nan"),
+                     "fill_price": agg["notional"] / agg["filled_qty"],
+                     "slippage_bps": float("nan"), "status": "unplanned"})
+
+    return pd.DataFrame(rows, columns=["ticker", "side", "planned_qty", "filled_qty",
+                                       "ref_price", "fill_price", "slippage_bps", "status"])
