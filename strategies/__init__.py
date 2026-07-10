@@ -5,5 +5,6 @@ from strategies import (  # noqa: F401  (registers)
     dual_window_momentum,
     long_short_pe,
     momentum,
+    sector_neutral_momentum,
 )
 from strategies.base import available, create

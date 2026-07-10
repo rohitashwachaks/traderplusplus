@@ -21,10 +21,11 @@ EDGAR fundamentals, screener = a strategy's latest row). See `docs/03-research-p
 python run.py --strategy=momentum --tickers=AAPL --benchmark=SPY --start=2023-01-01 --end=2024-01-01 --out=output/momentum
 ```
 
-Flags: `--strategy` (`buy_n_hold` | `momentum` | `xs_momentum` | `dual_momentum` | `ls_pe`), `--tickers` (comma-separated) **or**
-`--universe sp500` (with `--limit N` for quick runs), `--benchmark`, `--start`, `--end`, `--cash`, `--source`
-(`yahoo` | `polygon` | `alpaca`), `--interval`, `--out`, `--cost-bps` (commission+slippage per trade in bps of
-notional; `0` — the default — is frictionless and **stamped** as such on every artifact).
+Flags: `--strategy` (`buy_n_hold` | `momentum` | `xs_momentum` | `dual_momentum` | `ls_pe` |
+`sector_neutral_momentum`), `--tickers` (comma-separated) **or** `--universe sp500` (with `--limit N` for quick
+runs), `--benchmark`, `--start`, `--end`, `--cash`, `--source` (`yahoo` | `polygon` | `alpaca`), `--interval`,
+`--out`, `--cost-bps` (commission+slippage per trade in bps of notional; `0` — the default — is frictionless
+and **stamped** as such on every artifact), `--group-by` (classification key for a grouping strategy).
 
 Daily prices are served from the canonical store (`data_store/`): the first run fetches and ingests, every
 later run reads locally and fetches only new dates — re-running a backtest downloads nothing. Each output
@@ -88,7 +89,40 @@ Artifacts written to `--out`:
 | `equity_vs_benchmark.png` | Rebased equity vs benchmark |
 | `drawdown.png` | Strategy drawdown |
 | `tearsheet.html` | Full quantstats tearsheet (distribution, rolling Sharpe, alpha/beta, risk) |
-| `equity_explorer.html` | Interactive: equity + underlying prices + buy/sell markers; hover shows the portfolio split that day |
+| `equity_explorer.html` | Interactive: **cumulative return %** (breakeven = 0%) vs benchmark + underlying names, with a drawdown panel, a range **slider** and 1M/3M/6M/YTD/1Y/All buttons. Hover shows the portfolio split and the actual **dollar price** on each line — including the fill price at every buy/sell marker. |
+
+## Cross-industry strategies (sector / SIC classification)
+
+Each ticker carries a static classification in `ctx.meta`, so a strategy can rank and select **within**
+industries instead of letting one hot sector dominate. Two taxonomies, one source of truth each:
+
+- **GICS `sector` / `industry`** (GICS Sub-Industry) — from `data/sp500.csv`, so it's free and offline but
+  **only exists for `--universe sp500`**.
+- **SIC `sic` / `sic_description` / `sic2`** (2-digit major group) — from SEC EDGAR, so it works for **any**
+  US-filer universe. Pulled on demand when a `sic*` key is requested.
+
+`sector_neutral_momentum` holds the top trailing-return name in *each* group, so the book always spans
+industries:
+
+```bash
+# GICS sectors (SP500, no extra fetch)
+python run.py --strategy=sector_neutral_momentum --universe=sp500 --benchmark=SPY --start=2019-01-01 --end=2024-01-01
+# EDGAR SIC major groups — works on any universe
+python run.py --strategy=sector_neutral_momentum --tickers=AAPL,XOM,JPM,PFE,CAT --group-by=sic2 --benchmark=SPY --start=2019-01-01 --end=2024-01-01
+```
+
+The run logs the group breakdown, writes the full ticker→classification table to `classification.csv`, and
+**stamps every artifact**: the labels are *static* (today's GICS/SIC applied to all history — sector
+reclassification over time is unmodeled), a labeled bias in the same family as survivorship.
+
+To group inside your own strategy, set `requires_meta = ("sector",)` and use `strategies/grouping.py`:
+
+```python
+from strategies import grouping
+
+groups = grouping.group_series(ctx, self.group_by)          # ticker → label, aligned to columns
+picks = grouping.top_per_group(signal, groups, n=1)         # top-1 per group each day (bool panel)
+```
 
 ## How it fits together
 

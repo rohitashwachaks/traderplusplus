@@ -1,4 +1,5 @@
 import argparse
+import os
 from datetime import datetime
 
 import strategies  # registers built-in strategies
@@ -42,6 +43,9 @@ def parse_args():
     p.add_argument("--stop-reentry", type=int, default=None, metavar="N",
                    help="After a stop-out, re-enter after N trading days if the signal still wants "
                         "the name (default: stay out until the signal itself goes flat and re-fires)")
+    p.add_argument("--group-by", default=None,
+                   help="Classification key for a grouping strategy: sector | industry | sic2 "
+                        "(sic* pulls SIC from EDGAR; overrides the strategy's default)")
     p.add_argument("--rebalance", default=None,
                    help="Override rebalance frequency: D|W|M|Q|Y (default: the strategy's)")
     p.add_argument("--reconstitute", default=None,
@@ -63,6 +67,10 @@ def _cost_stamp(cost_bps: float) -> str:
     return f"costs modeled at {cost_bps:g} bps of traded notional; short borrow unmodeled"
 
 
+_CLASSIFICATION_STAMP = ("classification is static — today's GICS/SIC labels applied to all history; "
+                         "sector reclassification over time is unmodeled")
+
+
 def main():
     args = parse_args()
     benchmark = clean_ticker(args.benchmark)
@@ -80,7 +88,14 @@ def main():
             f"  python sweep.py --strategy={strategy.name} "
             f"--universe={args.universe or 'sp500'} --benchmark={benchmark}"
         )
+    if args.group_by:
+        strategy.group_by = args.group_by
+        strategy.requires_meta = (args.group_by,)
+    classify = any(k.startswith("sic") for k in strategy.requires_meta)
+
     stamps = [s for s in (universe.stamp(), _cost_stamp(args.cost_bps)) if s]
+    if strategy.requires_meta:
+        stamps.append(_CLASSIFICATION_STAMP)
     for stamp in stamps:
         log.warning("BIAS: %s", stamp)
 
@@ -91,9 +106,23 @@ def main():
     log.info("Loading %d names + benchmark %s (%s to %s); panels=%s",
              len(universe.tickers()), benchmark, args.start, args.end, panels)
     ctx = build_context(universe, args.start, args.end, panels=panels,
-                        source=args.source, interval=args.interval)
+                        source=args.source, interval=args.interval, classify=classify)
+
+    missing = [k for k in strategy.requires_meta if k not in ctx.meta.columns]
+    if missing:
+        raise SystemExit(
+            f"'{strategy.name}' needs classification {missing}, absent for universe '{universe.name}'. "
+            f"GICS keys (sector/industry) exist only for --universe sp500; for any universe use "
+            f"--group-by sic2 (EDGAR SIC)."
+        )
     benchmark_prices = get_source("price").load(
         [benchmark], args.start, args.end, source=args.source, interval=args.interval)
+
+    if strategy.requires_meta:
+        key = strategy.requires_meta[0]
+        counts = ctx.meta[key].value_counts()
+        log.info("Universe spans %d '%s' groups: %s", len(counts), key,
+                 ", ".join(f"{k}×{v}" for k, v in counts.head(12).items()))
 
     if args.rebalance:
         strategy.rebalance_freq = args.rebalance
@@ -112,6 +141,9 @@ def main():
         None)
     paths = write_reports(res, args.out, strategy.name, benchmark, ctx.price, caveats=stamps,
                           stop_levels=stop_levels)
+    if len(ctx.meta.columns):
+        paths["classification"] = os.path.join(args.out, "classification.csv")
+        ctx.meta.to_csv(paths["classification"])
     write_manifest(
         args.out, command="run", args=vars(args), strategy=strategy, stamps=stamps,
         universe={"name": universe.name, "biased": universe.biased,

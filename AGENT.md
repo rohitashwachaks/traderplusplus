@@ -110,12 +110,13 @@ core/store.py        canonical price store: additive per-ticker parquet + covera
 core/data_loader.py  legacy request cache (MD5 key) — intraday only; daily prices go through the store
 core/price_panel.py  OHLCV dict → tz-naive close panel for bt (+ data-quality gate: dupes raise, bad prices nulled loudly)
 core/sources.py      PanelSource registry (price, eps, eps_ttm, shares) — pluggable data behind the context
-core/context.py      DataContext: price · members · meta · fundamental(name) — the single strategy input; build_context outer-joins + ffills feature panels (point-in-time)
+core/context.py      DataContext: price · members · meta · fundamental(name) · classification(by) — the single strategy input; build_context outer-joins + ffills panels (point-in-time), classify=True merges EDGAR SIC into meta
 core/universe.py     Universe (ListUniverse, SP500 from data/sp500.csv) + membership mask + fingerprint (for manifests)
-core/fundamentals.py PIT panels, all as-first-filed & filed-date keyed: annual EPS · TTM EPS (Q4 from the 10-K) · shares (mcap = price × shares) · sic_meta
+core/fundamentals.py PIT panels, all as-first-filed & filed-date keyed: annual EPS · TTM EPS (Q4 from the 10-K) · shares (mcap = price × shares) · sic_meta (static SIC classification → meta)
+strategies/grouping.py  group_series / rank_within_group / top_per_group — cross-sectional grouping for sector-neutral (cross-industry) books
 data_ingestion/edgar_fetcher.py  SEC EDGAR: ticker→CIK (SEC map + committed-CSV overlay), companyconcept, companyfacts (full 10-K/10-Q line items), submissions (SIC)
 data/sp500.csv       pasted S&P 500 constituents incl. CIK — committed input
-strategies/          base.py (TargetWeightStrategy + registry, freq, single_asset, requires, attachable guardrails), buy_n_hold.py, momentum.py (single-asset), cross_sectional_momentum.py (xs_momentum), dual_window_momentum.py (dual_momentum), long_short_pe.py (ls_pe, requires eps)
+strategies/          base.py (TargetWeightStrategy + registry, freq, single_asset, requires, requires_meta, attachable guardrails), buy_n_hold.py, momentum.py (single-asset), cross_sectional_momentum.py (xs_momentum), dual_window_momentum.py (dual_momentum), long_short_pe.py (ls_pe, requires eps), sector_neutral_momentum.py (cross-industry, requires_meta sector/sic2)
 guardrails/          base.py (Guardrail + registry), stop_loss.py — risk overlays on weights
 research/            sweep.py (single-asset rule across a universe → per-name alpha/beta), report.py (distribution chart)
 engine/runner.py     builds & runs the bt backtest (+ benchmark), applies guardrails + frequencies + cost_bps commissions
@@ -134,7 +135,9 @@ tests/               no-look-ahead + golden-file + store + costs + EDGAR PIT + j
 
 Strategies receive a `DataContext` (`weights(ctx)`), never a raw price frame, and only hold names where
 `ctx.members` is true. A strategy declares any non-price data it needs via `requires` (e.g. `ls_pe` sets
-`requires = ("eps",)`); `build_context` loads those panels and forward-fills them point-in-time onto the
+`requires = ("eps",)`) and any static classification via `requires_meta` (e.g. `sector_neutral_momentum` sets
+`requires_meta = ("sector",)`, read through `ctx.classification(by)` + `strategies/grouping.py`); `build_context`
+loads those panels and forward-fills them point-in-time onto the
 trading calendar. A *single-asset* strategy (e.g. `momentum`) is validated by **sweeping** it across a universe
 one name at a time and reading the distribution of alpha/beta — not by pooling names into a basket.
 

@@ -17,9 +17,9 @@ the place to park an idea so we can pick it up later. For *committed* direction 
   alpha/beta/Sharpe/drawdown table + overlaid equity explorer, same stamps/manifest as `run.py`.
 - **[P1] CAPM rolling-beta as a derived feature** (`features/beta.py`) — needs only price + benchmark; feeds
   low-beta / betting-against-beta screens and is a natural diagnostic. Start of a `features/` layer.
-- **[P1] A proving strategy on the new EDGAR panels** — sector-neutral `ls_pe` (SIC) or a market-cap/volatility
-  screen, with its no-look-ahead test. The panels (`eps_ttm`, `shares`, SIC) landed 2026-07; a strategy should
-  exercise them.
+- **[P1] A proving strategy on the new EDGAR panels** — a market-cap/volatility screen (`shares`, `eps_ttm`),
+  with its no-look-ahead test. `sector_neutral_momentum` (2026-07) already exercises SIC/GICS classification;
+  a sector-neutral `ls_pe` (rank P/E within `sector`) is the natural next combiner of both.
 
 ### Trust, risk & ops
 
@@ -32,6 +32,10 @@ the place to park an idea so we can pick it up later. For *committed* direction 
   caveat labels (roll yield / expense drag are part of an ETP's real return; fundamentals panels don't apply).
 - **[P1] Risk / volatility layer** (roadmap M5) — vol targeting, position caps, max-drawdown guardrail. The
   authoring seam is ready (strategy-attached `guardrails` tuple, 2026-07); the overlays themselves remain.
+- **[P2] Point-in-time classification** — sector/SIC in `ctx.meta` is *static* (today's labels applied to all
+  history), a labeled bias that landed with cross-industry strategies (2026-07). Upgrade through the same
+  `meta` seam: historical GICS reclassifications / SIC-at-filing (mirrors the survivorship story — the strategy
+  never changes, only how meta is built). Sector-neutral books are only mildly sensitive, so this is P2.
 - **[P1] Paper-trading drift monitor + alerting** (roadmap M6 remainder) — paper equity vs the backtest's
   expectation over the same window; alert past a threshold. Journal + reconciliation (the inputs) shipped
   2026-07.
@@ -109,6 +113,10 @@ Decided (kept for the record):
 
 ## 5. Done recently (for context)
 
+- **2026-07:** Cross-industry classification — `ctx.classification(by)` + `build_context(classify=True)` merging
+  EDGAR SIC (`sic`/`sic_description`/`sic2`) alongside GICS sector/industry; `strategies/grouping.py`
+  (rank/select within group); `sector_neutral_momentum`; `--group-by` + `classification.csv` + a static-labels
+  bias stamp.
 - **2026-07:** Trust rails (manifest + bias stamps in every artifact, golden-file test, CI, pinned
   `auto_adjust`, panel data-quality gate) · canonical **price store** (additive per-ticker parquet, gap-only
   fetching) · **cost machinery** (`--cost-bps`, turnover) · strategy-attached **guardrails** · EDGAR expansion

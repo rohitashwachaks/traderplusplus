@@ -75,6 +75,7 @@ flowchart TD
 | `xs_momentum` | basket | Cross-sectional: hold the top trailing-return names, reconstituted monthly. |
 | `dual_momentum` | basket | Rank by short-vs-long *rate* (accelerating momentum). |
 | `ls_pe` | basket, long/short | Dollar-neutral: long cheapest P/E, short richest, on point-in-time EDGAR EPS. |
+| `sector_neutral_momentum` | basket, cross-industry | Hold the top momentum name in *each* sector/SIC group, so the book spans industries. |
 
 ---
 

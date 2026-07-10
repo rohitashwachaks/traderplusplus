@@ -49,6 +49,21 @@ class DataContext:
         """Read a point-in-time feature panel (alias of :meth:`panel`, reads better in strategies)."""
         return self.panel(name)
 
+    def classification(self, by: str) -> pd.Series:
+        """Static per-ticker group label (e.g. ``"sector"``, ``"industry"``, ``"sic2"``).
+
+        Aligned to the price columns, so it drops straight into cross-sectional group ops
+        (see :mod:`strategies.grouping`). Unlike a panel this is **static** — one label per
+        name for all history — which is a labeled classification bias (sector drift is
+        unmodeled), not a look-ahead within the day.
+        """
+        if by not in self.meta.columns:
+            raise KeyError(
+                f"No classification '{by}' in meta. Have: {sorted(self.meta.columns)}. "
+                f"For a non-GICS universe, request SIC via build_context(classify=True)."
+            )
+        return self.meta[by].reindex(self.price.columns)
+
     @classmethod
     def from_prices(
         cls,
@@ -72,6 +87,7 @@ def build_context(
     *,
     panels: tuple[str, ...] = ("price",),
     join: str = "outer",
+    classify: bool = False,
     **opts,
 ) -> DataContext:
     """Assemble a :class:`DataContext` for ``universe`` over ``[start, end]``.
@@ -119,4 +135,21 @@ def build_context(
         aligned[name] = panel.reindex(index=idx, columns=columns).ffill().reindex(calendar)
     aligned["members"] = universe.membership(calendar, columns) & price.notna()
     meta = universe.meta().reindex(columns)
+    if classify:
+        meta = _with_sic(meta, columns)
     return DataContext(panels=aligned, meta=meta)
+
+
+def _with_sic(meta: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    """Merge EDGAR SIC classification onto ``meta``: ``sic``, ``sic_description``, ``sic2``.
+
+    SIC is the general (any-US-filer) taxonomy, from the single EDGAR source; ``sic2`` is the
+    2-digit major group — coarse enough that sector-neutral ranking has names per bucket
+    (raw 4-digit SIC is often one name). GICS columns from the universe CSV are left as-is.
+    """
+    from core.fundamentals import sic_meta
+
+    sic = sic_meta(columns)
+    sic["sic"] = sic["sic"].astype("string")
+    sic["sic2"] = sic["sic"].str.zfill(4).str[:2]
+    return meta.join(sic, how="left")
